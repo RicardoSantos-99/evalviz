@@ -33,6 +33,7 @@ Early development. Not published to Hex yet.
 - [x] Elbow plot
 - [x] Coefficients and correlation matrix
 - [x] Residual histogram and normal Q-Q
+- [x] Validation curve, grid search heatmap, per-fold scores
 
 ## Trying it
 
@@ -219,6 +220,46 @@ This one does not train anything: pass the scores you already measured, the
 same split scikit-learn draws between computing a learning curve and displaying
 one. Give it a score per fold and the mean is drawn with a band one standard
 deviation wide.
+
+### Model selection
+
+The learning curve asks whether more data would help. These three work with the
+data you have.
+
+```elixir
+EvalViz.validation_curve(alphas, train_scores, validation_scores,
+  param_name: "alpha",
+  scale: :log
+)
+```
+
+Score against one hyperparameter, with the best marked. Parameter values may be
+numbers, and then the axis can be logarithmic, which is how regularisation is
+usually swept. Anything else, booleans and atoms included, goes on a nominal
+axis in the order given.
+
+```elixir
+results = Scholar.ModelSelection.grid_search(x, y, folding_fun, scoring_fun, opts)
+
+EvalViz.grid_search(results, best: :min, metric_name: "MSE")
+```
+
+Takes what `Scholar.ModelSelection.grid_search/5` returns and lays it out as a
+heatmap. Without `:x` and `:y` it uses the two hyperparameters that vary; name
+two when more vary and the rest are collapsed by keeping the best score per
+cell, which the subtitle says out loud. Darker always means better, so
+`best: :min` reverses the ramp rather than leaving you to invert it by eye.
+
+```elixir
+scores = Scholar.ModelSelection.cross_validate(x, y, folding_fun, scoring_fun)
+
+EvalViz.fold_scores(scores, metric_names: ["MSE", "MAE"])
+```
+
+A mean says nothing about how much it moved between folds. This is that spread,
+one panel per metric. The folds are not joined by a line: they are
+interchangeable, and a line would show a trend across an order that means
+nothing.
 
 ### Calibration
 

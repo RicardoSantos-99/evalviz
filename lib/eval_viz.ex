@@ -30,6 +30,8 @@ defmodule EvalViz do
   alias EvalViz.Dendrogram
   alias EvalViz.Distribution
   alias EvalViz.Elbow
+  alias EvalViz.FoldScores
+  alias EvalViz.GridSearch
   alias EvalViz.Internal
   alias EvalViz.LearningCurve
   alias EvalViz.Loadings
@@ -39,6 +41,7 @@ defmodule EvalViz do
   alias EvalViz.ScoreDistribution
   alias EvalViz.Threshold
   alias EvalViz.Silhouette
+  alias EvalViz.ValidationCurve
 
   @doc """
   Plots a confusion matrix as a heatmap with the value written in each cell.
@@ -726,6 +729,105 @@ defmodule EvalViz do
   def learning_curve(train_sizes, train_scores, validation_scores, opts \\ []) do
     LearningCurve.plot(train_sizes, train_scores, validation_scores, opts)
   end
+
+  @doc """
+  Plots training and validation score against one hyperparameter.
+
+  The learning curve asks whether more data would help. This asks the question
+  you answer with the data you have: how far to turn one knob. The two curves
+  meeting low means the setting is too restrictive, and a gap that widens as
+  the parameter grows means it is fitting noise.
+
+  Like `learning_curve/4` this trains nothing: pass the scores you measured.
+  Parameter values may be numbers, in which case the axis is quantitative and
+  can be logarithmic, or anything else, in which case it is nominal and keeps
+  the order you gave.
+
+  ## Options
+
+  #{NimbleOptions.docs(ValidationCurve.schema())}
+
+  ## Examples
+
+      iex> alphas = [0.01, 0.1, 1.0, 10.0]
+      iex> train = [0.99, 0.97, 0.90, 0.72]
+      iex> validation = [0.80, 0.88, 0.86, 0.70]
+      iex> plot = EvalViz.validation_curve(alphas, train, validation, param_name: "alpha")
+      iex> VegaLite.to_spec(plot)["title"]["subtitle"]
+      "best 0.88 at alpha = 0.1"
+
+      iex> alphas = [0.01, 0.1, 1.0, 10.0]
+      iex> train = [0.99, 0.97, 0.90, 0.72]
+      iex> validation = [0.80, 0.88, 0.86, 0.70]
+      iex> plot = EvalViz.validation_curve(alphas, train, validation, scale: :log)
+      iex> VegaLite.to_spec(plot)["layer"]
+      ...> |> List.last()
+      ...> |> get_in(["encoding", "x", "scale", "type"])
+      "log"
+  """
+  def validation_curve(param_values, train_scores, validation_scores, opts \\ []) do
+    ValidationCurve.plot(param_values, train_scores, validation_scores, opts)
+  end
+
+  @doc """
+  Plots a grid search as a heatmap, one cell per pair of hyperparameter values.
+
+  Takes what `Scholar.ModelSelection.grid_search/5` returns: a list of
+  `%{hyperparameters: keyword, score: tensor}`. Without `:x` and `:y` it uses
+  the two hyperparameters that vary. When more than two vary, name the two to
+  plot and the rest are collapsed by keeping the best score for each cell,
+  which the subtitle says out loud.
+
+  Darker always means better, so `best: :min` reverses the ramp rather than
+  leaving you to invert it by eye.
+
+  ## Options
+
+  #{NimbleOptions.docs(GridSearch.schema())}
+
+  ## Examples
+
+      iex> results = [
+      ...>   %{hyperparameters: [alpha: 0.0, iterations: 10], score: Nx.tensor([0.7])},
+      ...>   %{hyperparameters: [alpha: 0.0, iterations: 50], score: Nx.tensor([0.8])},
+      ...>   %{hyperparameters: [alpha: 1.0, iterations: 10], score: Nx.tensor([0.6])},
+      ...>   %{hyperparameters: [alpha: 1.0, iterations: 50], score: Nx.tensor([0.9])}
+      ...> ]
+      iex> plot = EvalViz.grid_search(results, x: :iterations, y: :alpha)
+      iex> VegaLite.to_spec(plot)["title"]["subtitle"]
+      "best 0.9 at iterations 50, alpha 1.0"
+  """
+  def grid_search(results, opts \\ []), do: GridSearch.plot(results, opts)
+
+  @doc """
+  Plots the score each fold got, with the mean they scatter around.
+
+  Takes what `Scholar.ModelSelection.cross_validate/4` returns, a
+  `{num_metrics, num_folds}` tensor, and draws a panel per metric. A single
+  metric may be passed as a rank-1 tensor.
+
+  A mean on its own says nothing about how much it moved between folds. This is
+  that spread, stated in each panel's subtitle as well as drawn. The folds are
+  not joined by a line: they are interchangeable, and joining them would show a
+  trend across an order that carries no meaning.
+
+  ## Options
+
+  #{NimbleOptions.docs(FoldScores.schema())}
+
+  ## Examples
+
+      iex> scores = Nx.tensor([[0.80, 0.86, 0.84], [1.20, 1.10, 1.15]], type: :f64)
+      iex> plot = EvalViz.fold_scores(scores, metric_names: ["Accuracy", "Loss"])
+      iex> VegaLite.to_spec(plot)["vconcat"] |> Enum.map(&(&1["title"]["text"]))
+      ["Accuracy", "Loss"]
+
+      iex> scores = Nx.tensor([0.80, 0.86, 0.84], type: :f64)
+      iex> plot = EvalViz.fold_scores(scores)
+      iex> VegaLite.to_spec(plot)["title"]["subtitle"]
+      "mean 0.8333 ± 0.0249"
+  """
+  def fold_scores(scores, opts \\ []), do: FoldScores.plot(scores, opts)
 
   defp normalize_series(series) do
     Enum.map(series, fn

@@ -50,6 +50,14 @@ defmodule EvalViz.LearningCurveTest do
       assert line["mark"]["type"] == "line"
     end
 
+    # The band and the line share the colour field, so hiding the legend on the
+    # band hides the merged one and leaves two curves with nothing naming them.
+    test "keeps the legend the band could suppress" do
+      [band, _line] = spec(EvalViz.learning_curve(sizes(), train(), validation()))["layer"]
+
+      refute Map.has_key?(band["encoding"]["color"], "legend")
+    end
+
     test "accepts one score per size, and then has no band to draw" do
       plot = EvalViz.learning_curve(sizes(), [1.0, 0.9, 0.8], [0.5, 0.7, 0.8])
 

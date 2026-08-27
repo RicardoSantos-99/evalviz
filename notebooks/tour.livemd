@@ -195,6 +195,98 @@ EvalViz.learning_curve(
 )
 ```
 
+## Model selection
+
+The learning curve asks whether more data would help. These work with the data
+you already have, and they run against `Scholar.ModelSelection` directly.
+
+```elixir
+{ms_x, ms_key} = Nx.Random.normal(Nx.Random.key(9), 0.0, 1.0, shape: {80, 4})
+
+ms_y =
+  Nx.add(
+    Nx.add(Nx.multiply(ms_x[[.., 0]], 2.0), Nx.multiply(ms_x[[.., 1]], -1.0)),
+    elem(Nx.Random.normal(ms_key, 0.0, 0.5, shape: {80}), 0)
+  )
+
+folding = fn t -> Scholar.ModelSelection.k_fold_split(t, 5) end
+
+scoring = fn xs, ys ->
+  {x_train, x_test} = xs
+  {y_train, y_test} = ys
+  model = Scholar.Linear.RidgeRegression.fit(x_train, y_train, alpha: 1.0)
+  pred = Scholar.Linear.RidgeRegression.predict(model, x_test)
+
+  [
+    Scholar.Metrics.Regression.mean_square_error(y_test, pred),
+    Scholar.Metrics.Regression.mean_absolute_error(y_test, pred)
+  ]
+end
+
+Scholar.ModelSelection.cross_validate(ms_x, ms_y, folding, scoring)
+|> EvalViz.fold_scores(metric_names: ["MSE", "MAE"], title: "Five folds")
+```
+
+One panel per metric, one point per fold, with the mean they scatter around.
+The folds are not joined: they are interchangeable, so a line would draw a
+trend across an order that means nothing. Each subtitle states the spread that
+a mean on its own would hide.
+
+Now the same model over a grid of settings:
+
+```elixir
+grid_scoring = fn xs, ys, opts ->
+  {x_train, x_test} = xs
+  {y_train, y_test} = ys
+  model = Scholar.Linear.RidgeRegression.fit(x_train, y_train, opts)
+  pred = Scholar.Linear.RidgeRegression.predict(model, x_test)
+
+  [Scholar.Metrics.Regression.mean_square_error(y_test, pred)]
+end
+
+Scholar.ModelSelection.grid_search(ms_x, ms_y, folding, grid_scoring,
+  alpha: [0.0, 0.5, 1.0, 5.0, 20.0],
+  fit_intercept?: [true, false]
+)
+|> EvalViz.grid_search(best: :min, metric_name: "MSE", title: "Grid search")
+```
+
+MSE is best at its smallest, so `best: :min` both outlines the winning cell and
+reverses the colour ramp: darker stays better rather than asking you to invert
+it by eye.
+
+And one knob on its own, swept over orders of magnitude:
+
+```elixir
+EvalViz.validation_curve(
+  [0.001, 0.01, 0.1, 1.0, 10.0, 100.0],
+  [
+    [0.99, 0.99],
+    [0.98, 0.98],
+    [0.96, 0.95],
+    [0.90, 0.89],
+    [0.71, 0.70],
+    [0.40, 0.38]
+  ],
+  [
+    [0.82, 0.80],
+    [0.87, 0.85],
+    [0.91, 0.89],
+    [0.88, 0.86],
+    [0.69, 0.67],
+    [0.39, 0.37]
+  ],
+  param_name: "alpha",
+  scale: :log,
+  title: "Ridge regularisation"
+)
+```
+
+The whole story in one picture: too little regularisation on the left, where
+training beats validation, too much on the right, where both collapse, and the
+best setting marked between them. A linear axis would crush every small value
+against the origin, which is why the sweep is drawn on a log scale.
+
 ## Calibration
 
 A model whose probabilities mean what they say tracks the diagonal.
