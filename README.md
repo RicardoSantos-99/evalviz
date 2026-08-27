@@ -34,6 +34,7 @@ Early development. Not published to Hex yet.
 - [x] Coefficients and correlation matrix
 - [x] Residual histogram and normal Q-Q
 - [x] Validation curve, grid search heatmap, per-fold scores
+- [x] One-call report, and a grid to compose any plots
 
 ## Trying it
 
@@ -49,6 +50,31 @@ model is deliberately wrong so you can see what that looks like.
 Rendering a spec in Livebook needs `kino_vega_lite`, not just `kino`: the
 `Kino.Render` implementation for `VegaLite` ships in that package, and without
 it Livebook prints the struct rather than drawing the chart.
+
+## The short version
+
+One call for the whole picture:
+
+```elixir
+EvalViz.report(y_true, scores, class_names: ["negative", "positive"])
+```
+
+A confusion matrix, the ROC and precision-recall curves, and the scores split
+by true class. The matrix and the histogram read the same `:threshold`, so the
+report shows what one cut-off actually does rather than four unrelated views.
+
+`kind: :regression` reads the second argument as predictions and gives
+predicted against actual, the residuals, their distribution and a normal Q-Q.
+
+To choose your own set, build the plots and lay them out:
+
+```elixir
+EvalViz.grid([
+  EvalViz.roc_curve(y_true, scores, title: "ROC"),
+  EvalViz.calibration_curve(y_true, scores, title: "Calibration"),
+  EvalViz.silhouette(x, labels, num_clusters: 3, title: "Clusters")
+])
+```
 
 ## Usage
 

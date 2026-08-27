@@ -31,12 +31,14 @@ defmodule EvalViz do
   alias EvalViz.Distribution
   alias EvalViz.Elbow
   alias EvalViz.FoldScores
+  alias EvalViz.Grid
   alias EvalViz.GridSearch
   alias EvalViz.Internal
   alias EvalViz.LearningCurve
   alias EvalViz.Loadings
   alias EvalViz.Projection
   alias EvalViz.Regression
+  alias EvalViz.Report
   alias EvalViz.Scree
   alias EvalViz.ScoreDistribution
   alias EvalViz.Threshold
@@ -828,6 +830,76 @@ defmodule EvalViz do
       "mean 0.8333 ± 0.0249"
   """
   def fold_scores(scores, opts \\ []), do: FoldScores.plot(scores, opts)
+
+  @doc """
+  Lays several plots out in a wrapping grid.
+
+  Takes anything that returns a `VegaLite` specification, this library's
+  functions included, so a screen of related plots is one value you can pass
+  around and render.
+
+  Vega-Lite allows `$schema`, `background`, `padding`, `autosize`, `config` and
+  `usermeta` only on the outermost specification, so apply `VegaLite.config/2`
+  to the grid rather than to the plots going into it.
+
+  ## Options
+
+  #{NimbleOptions.docs(Grid.schema())}
+
+  ## Examples
+
+      iex> y_true = Nx.tensor([0, 0, 1, 1])
+      iex> scores = Nx.tensor([0.1, 0.4, 0.35, 0.8])
+      iex> plot =
+      ...>   EvalViz.grid([
+      ...>     EvalViz.roc_curve(y_true, scores),
+      ...>     EvalViz.precision_recall_curve(y_true, scores)
+      ...>   ])
+      iex> VegaLite.to_spec(plot)["columns"]
+      2
+
+      iex> y_true = Nx.tensor([0, 0, 1, 1])
+      iex> scores = Nx.tensor([0.1, 0.4, 0.35, 0.8])
+      iex> plot = EvalViz.grid([EvalViz.roc_curve(y_true, scores)], columns: 1)
+      iex> VegaLite.to_spec(plot)["concat"] |> length()
+      1
+  """
+  def grid(views, opts \\ []), do: Grid.plot(views, opts)
+
+  @doc """
+  Draws a screen of the plots that go together for one model.
+
+  For a binary classifier that is the confusion matrix, the ROC and
+  precision-recall curves, and the scores split by true class. The confusion
+  matrix and the score distribution read the same `:threshold`, so the report
+  shows what one cut-off actually does.
+
+  Pass `kind: :regression` and the second argument is read as predictions
+  rather than scores, giving predicted against actual, the residuals, their
+  distribution, and a normal Q-Q.
+
+  This is a convenience over `grid/2`: build the plots yourself and lay them
+  out with that when you want a different set.
+
+  ## Options
+
+  #{NimbleOptions.docs(Report.schema())}
+
+  ## Examples
+
+      iex> y_true = Nx.tensor([0, 0, 1, 1, 0, 1])
+      iex> scores = Nx.tensor([0.1, 0.4, 0.35, 0.8, 0.2, 0.9])
+      iex> plot = EvalViz.report(y_true, scores)
+      iex> VegaLite.to_spec(plot)["concat"] |> length()
+      4
+
+      iex> y_true = Nx.tensor([1.0, 2.0, 3.0, 4.0])
+      iex> y_pred = Nx.tensor([1.2, 1.9, 3.3, 3.8])
+      iex> plot = EvalViz.report(y_true, y_pred, kind: :regression, columns: 4)
+      iex> VegaLite.to_spec(plot)["columns"]
+      4
+  """
+  def report(y_true, y_predicted, opts \\ []), do: Report.plot(y_true, y_predicted, opts)
 
   defp normalize_series(series) do
     Enum.map(series, fn

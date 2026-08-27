@@ -552,7 +552,46 @@ The colour scale is pinned to `-1..1` rather than fitted, so a matrix of weak
 correlations does not colour like a matrix of strong ones. These six columns
 were built from three directions, and the heatmap says so.
 
+## The whole picture in one call
+
+Everything above, one plot at a time. Most of the time you want the screen:
+
+```elixir
+EvalViz.report(labels, weak,
+  class_names: ["negative", "positive"],
+  title: "The weak model, held out"
+)
+```
+
+The confusion matrix and the histogram read the same threshold, so this is not
+four unrelated views: the matrix counts exactly what the rule on the histogram
+splits. Move the threshold and both move together.
+
+```elixir
+EvalViz.report(labels, weak, threshold: 0.7, title: "Cutting at 0.7 instead")
+```
+
+Regression gets its own set, from the same function:
+
+```elixir
+EvalViz.report(target, predicted, kind: :regression, title: "Linear fit")
+```
+
 ## Composing
+
+`report/3` is a convenience over `grid/2`, which lays out whatever you hand it.
+
+```elixir
+EvalViz.grid(
+  [
+    EvalViz.roc_curve(labels, scores, title: "ROC"),
+    EvalViz.calibration_curve(labels, scores, bins: 8, title: "Calibration"),
+    EvalViz.silhouette(groups, kmeans.labels, num_clusters: 3, title: "Clusters"),
+    EvalViz.scree(pca, title: "Explained variance")
+  ],
+  title: "Whatever goes together"
+)
+```
 
 Every function returns a `VegaLite` struct, so you can keep going with the
 `VegaLite` API.
@@ -560,4 +599,12 @@ Every function returns a `VegaLite` struct, so you can keep going with the
 ```elixir
 EvalViz.roc_curve(labels, scores, title: "Held-out set")
 |> VegaLite.config(axis: [grid: false], view: [stroke: nil])
+```
+
+`VegaLite.config/2` sets a key Vega-Lite only allows on the outermost
+specification, so it goes on the grid rather than on the plots inside it.
+
+```elixir
+EvalViz.grid([EvalViz.roc_curve(labels, scores), EvalViz.det_curve(labels, scores)])
+|> VegaLite.config(axis: [grid: false])
 ```
