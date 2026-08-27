@@ -36,6 +36,10 @@ open -a Livebook notebooks/tour.livemd
 The tour walks through every plot with generated data, including cases where a
 model is deliberately wrong so you can see what that looks like.
 
+Rendering a spec in Livebook needs `kino_vega_lite`, not just `kino`: the
+`Kino.Render` implementation for `VegaLite` ships in that package, and without
+it Livebook prints the struct rather than drawing the chart.
+
 ## Usage
 
 ```elixir
