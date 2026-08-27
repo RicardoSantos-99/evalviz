@@ -13,9 +13,11 @@ defmodule EvalViz do
   anywhere else.
   """
 
+  alias EvalViz.Calibration
   alias EvalViz.ConfusionMatrix
   alias EvalViz.Curves
   alias EvalViz.Dendrogram
+  alias EvalViz.Regression
   alias EvalViz.Scree
   alias EvalViz.Silhouette
 
@@ -185,6 +187,72 @@ defmodule EvalViz do
 
   def scree(%{explained_variance_ratio: ratios}, opts), do: Scree.plot(ratios, opts)
   def scree(ratios, opts), do: Scree.plot(ratios, opts)
+
+  @doc """
+  Plots a calibration curve: how often the positive class actually occurs,
+  against the probability the model gave it.
+
+  A well calibrated model tracks the diagonal, meaning that among the cases it
+  called 70% likely, roughly 70% turned out positive. Takes the same shapes as
+  `roc_curve/3`, so a list of `{label, y_true, y_prob}` compares models.
+
+  Unlike the ranking curves, this one needs real probabilities rather than
+  arbitrary scores.
+
+  ## Options
+
+  #{NimbleOptions.docs(Calibration.schema())}
+
+  ## Examples
+
+      EvalViz.calibration_curve(y_true, probabilities, bins: 5)
+  """
+  def calibration_curve(series_or_y_true, y_prob_or_opts \\ [], opts \\ [])
+
+  def calibration_curve(series, opts, _) when is_list(series) and is_list(opts) do
+    Calibration.plot(normalize_series(series), opts)
+  end
+
+  def calibration_curve(y_true, y_prob, opts) do
+    Calibration.plot([{nil, y_true, y_prob}], opts)
+  end
+
+  @doc """
+  Plots predicted against actual values, with the diagonal a perfect model
+  would sit on.
+
+  Both axes share one range, so distance from the diagonal reads directly as
+  error rather than being distorted by two different scales.
+
+  ## Options
+
+  #{NimbleOptions.docs(Regression.schema())}
+
+  ## Examples
+
+      EvalViz.predicted_vs_actual(y_true, y_pred)
+  """
+  def predicted_vs_actual(y_true, y_pred, opts \\ []) do
+    Regression.predicted_vs_actual(y_true, y_pred, opts)
+  end
+
+  @doc """
+  Plots residuals against predicted values.
+
+  Points scattered evenly around zero mean the model has no systematic bias
+  left; a curve or a widening fan means it has.
+
+  ## Options
+
+  #{NimbleOptions.docs(Regression.schema())}
+
+  ## Examples
+
+      EvalViz.residuals(y_true, y_pred)
+  """
+  def residuals(y_true, y_pred, opts \\ []) do
+    Regression.residuals(y_true, y_pred, opts)
+  end
 
   defp normalize_series(series) do
     Enum.map(series, fn

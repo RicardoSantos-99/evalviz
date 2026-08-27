@@ -22,6 +22,8 @@ Early development. Not published to Hex yet.
 - [x] Dendrogram
 - [x] Silhouette plot
 - [x] PCA scree plot
+- [x] Calibration curve
+- [x] Residuals and predicted vs actual
 
 ## Usage
 
@@ -87,6 +89,22 @@ EvalViz.silhouette(x, labels, num_clusters: 3)
 
 pca = Scholar.Decomposition.PCA.fit(x, num_components: 6)
 EvalViz.scree(pca)
+```
+
+### Calibration
+
+```elixir
+EvalViz.calibration_curve(y_true, probabilities, bins: 10)
+```
+
+Needs real probabilities rather than arbitrary scores: it asks whether, among
+the cases the model called 70% likely, roughly 70% turned out positive.
+
+### Regression
+
+```elixir
+EvalViz.predicted_vs_actual(y_true, y_pred)
+EvalViz.residuals(y_true, y_pred)
 ```
 
 ## License
