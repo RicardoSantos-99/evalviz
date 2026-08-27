@@ -26,6 +26,7 @@ Early development. Not published to Hex yet.
 - [x] Residuals and predicted vs actual
 - [x] Threshold curve
 - [x] Learning curve
+- [x] Multiclass one-vs-rest, with micro and macro averages
 
 ## Trying it
 
@@ -81,6 +82,24 @@ EvalViz.roc_curve([
   {"Naive Bayes", y_true, nb_scores}
 ])
 ```
+
+### Multiclass
+
+Pass class indices and a `{num_samples, num_classes}` score matrix for one
+one-vs-rest curve per class. ROC, precision-recall, DET, calibration and the
+threshold curve all take this shape.
+
+```elixir
+EvalViz.roc_curve(y_true, probabilities,
+  class_names: ["cat", "dog", "bird"],
+  average: [:micro, :macro]
+)
+```
+
+`:micro` pools every (sample, class) pair into one binary problem, so every
+sample weighs the same. `:macro` averages the per-class curves, so every class
+does, however few samples it has. Both match `scikit-learn`, curve values
+included.
 
 ### Dendrogram
 

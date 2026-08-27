@@ -2,6 +2,7 @@ defmodule EvalViz.Threshold do
   @moduledoc false
 
   alias EvalViz.Internal
+  alias EvalViz.Multiclass
   alias EvalViz.Theme
   alias Scholar.Metrics.Classification, as: Metrics
   alias VegaLite, as: Vl
@@ -12,12 +13,27 @@ defmodule EvalViz.Threshold do
                    default: [:precision, :recall, :f1],
                    doc: "Which curves to draw."
                  ],
+                 class_names: [
+                   type: {:list, {:or, [:string, :atom, :integer]}},
+                   doc: """
+                   Names for each class when `y_score` has one column per class.
+                   Defaults to `0..num_classes - 1`.
+                   """
+                 ],
+                 average: [
+                   type: {:in, [:micro]},
+                   doc: """
+                   Set to `:micro` to add a set of curves pooling every
+                   (sample, class) pair into one binary problem.
+                   """
+                 ],
                  mark_best_f1: [
                    type: :boolean,
                    default: true,
                    doc: """
                    Marks the threshold with the highest F1. Only drawn when `:f1`
-                   is among the metrics.
+                   is among the metrics and the input is binary, since one-vs-rest
+                   classes each peak somewhere different.
                    """
                  ],
                  title: [type: :string, doc: "Chart title."],
@@ -31,21 +47,26 @@ defmodule EvalViz.Threshold do
 
   def plot(y_true, y_score, opts) do
     opts = NimbleOptions.validate!(opts, @opts_schema)
-    Internal.assert_paired!(y_true, y_score, "y_true", "y_score")
-    assert_binary!(y_true)
 
-    rows = curve(y_true, y_score, opts[:metrics])
-    best = best_f1(rows, opts)
+    entry = {nil, y_true, y_score}
+    sub_series = Multiclass.per_class(entry, opts) ++ Multiclass.micro(entry, opts)
+    multi? = length(sub_series) > 1
+
+    rows = Enum.flat_map(sub_series, &curve(&1, opts[:metrics]))
+    best = best_f1(rows, opts, multi?)
 
     Vl.new(vl_opts(opts, best))
     |> Vl.data_from_values(rows)
-    |> Vl.layers(layers(rows, best, opts))
+    |> Vl.layers(layers(rows, best, multi?, opts))
   end
 
   # precision_recall_curve returns one more precision/recall than it does
   # thresholds: the final pair is the degenerate point where nothing is
   # predicted positive, which has no threshold to sit at.
-  defp curve(y_true, y_score, metrics) do
+  defp curve({class, y_true, y_score}, metrics) do
+    Internal.assert_paired!(y_true, y_score, "y_true", "y_score")
+    assert_binary!(y_true)
+
     dvi = Metrics.distinct_value_indices(y_score)
     {precision, recall, thresholds} = Metrics.precision_recall_curve(y_true, y_score, dvi)
 
@@ -59,19 +80,25 @@ defmodule EvalViz.Threshold do
       values = %{precision: p, recall: r, f1: f1(p, r)}
 
       Enum.map(metrics, fn metric ->
-        %{
-          "threshold" => threshold,
-          "value" => Map.fetch!(values, metric),
-          "metric" => Map.fetch!(@names, metric)
-        }
+        row(threshold, Map.fetch!(values, metric), Map.fetch!(@names, metric), class)
       end)
     end)
+  end
+
+  defp row(threshold, value, metric, nil) do
+    %{"threshold" => threshold, "value" => value, "metric" => metric}
+  end
+
+  defp row(threshold, value, metric, class) do
+    %{"threshold" => threshold, "value" => value, "metric" => metric, "class" => class}
   end
 
   defp f1(precision, recall) when precision + recall == 0, do: 0.0
   defp f1(precision, recall), do: 2 * precision * recall / (precision + recall)
 
-  defp best_f1(rows, opts) do
+  defp best_f1(_rows, _opts, true), do: nil
+
+  defp best_f1(rows, opts, false) do
     if opts[:mark_best_f1] and :f1 in opts[:metrics] do
       rows
       |> Enum.filter(&(&1["metric"] == "F1"))
@@ -79,7 +106,7 @@ defmodule EvalViz.Threshold do
     end
   end
 
-  defp layers(rows, best, opts) do
+  defp layers(rows, best, multi?, opts) do
     metric_names = Enum.map(opts[:metrics], &Map.fetch!(@names, &1))
 
     lines =
@@ -91,17 +118,39 @@ defmodule EvalViz.Threshold do
         title: nil,
         scale: [domain: [0, 1], nice: false]
       )
-      |> Vl.encode_field(:color, "metric",
-        type: :nominal,
-        title: nil,
-        scale: [domain: metric_names, range: Theme.categorical(length(metric_names))]
-      )
+      |> encode_series(rows, metric_names, multi?)
 
     if best do
       [best_layer(best), lines]
     else
       [lines]
     end
+  end
+
+  defp encode_series(layer, _rows, metric_names, false) do
+    Vl.encode_field(layer, :color, "metric",
+      type: :nominal,
+      title: nil,
+      scale: [domain: metric_names, range: Theme.categorical(length(metric_names))]
+    )
+  end
+
+  # With a class per curve there are two things to tell apart at once, so colour
+  # carries the class and the dash pattern the metric.
+  defp encode_series(layer, rows, metric_names, true) do
+    classes = rows |> Enum.map(& &1["class"]) |> Enum.uniq()
+
+    layer
+    |> Vl.encode_field(:color, "class",
+      type: :nominal,
+      title: nil,
+      scale: [domain: classes, range: Theme.categorical(length(classes))]
+    )
+    |> Vl.encode_field(:stroke_dash, "metric",
+      type: :nominal,
+      title: nil,
+      scale: [domain: metric_names]
+    )
   end
 
   defp best_layer(best) do
@@ -115,7 +164,10 @@ defmodule EvalViz.Threshold do
     distinct = y_true |> Nx.to_flat_list() |> Enum.uniq() |> Enum.sort()
 
     unless distinct == [0] or distinct == [1] or distinct == [0, 1] do
-      raise ArgumentError, "expected y_true to hold only 0 and 1, got #{inspect(distinct)}"
+      raise ArgumentError,
+            "expected y_true to hold only 0 and 1, got #{inspect(distinct)}. " <>
+              "For a multiclass model pass a y_score with one column per class, " <>
+              "and y_true as class indices."
     end
 
     :ok

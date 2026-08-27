@@ -77,6 +77,62 @@ EvalViz.precision_recall_curve(
 EvalViz.det_curve(labels, weak, title: "DET")
 ```
 
+## Multiclass
+
+Pass a score matrix with one column per class and you get one one-vs-rest curve
+each. These three blobs overlap on purpose, so the middle one is genuinely
+harder to separate than the two on the outside.
+
+```elixir
+mc_key = Nx.Random.key(7)
+
+{ma, mc_key} = Nx.Random.normal(mc_key, 0.0, 1.6, shape: {60, 2})
+{mb, mc_key} = Nx.Random.normal(mc_key, 1.8, 1.6, shape: {60, 2})
+{mc, _mc_key} = Nx.Random.normal(mc_key, 3.4, 1.6, shape: {60, 2})
+
+mx = Nx.concatenate([ma, mb, mc])
+
+my =
+  Nx.concatenate([
+    Nx.broadcast(0, {60}),
+    Nx.broadcast(1, {60}),
+    Nx.broadcast(2, {60})
+  ])
+
+model = Scholar.Linear.LogisticRegression.fit(mx, my, num_classes: 3)
+probabilities = Scholar.Linear.LogisticRegression.predict_probability(model, mx)
+
+EvalViz.roc_curve(my, probabilities,
+  class_names: ["left", "middle", "right"],
+  title: "One-vs-rest ROC"
+)
+```
+
+`middle` scores well below the other two, which is what being boxed in on both
+sides looks like.
+
+`:average` adds a curve over the classes. `:micro` pools every (sample, class)
+pair into one binary problem, so every sample counts the same; `:macro` averages
+the per-class curves, so every class does, however few samples it has.
+
+```elixir
+EvalViz.roc_curve(my, probabilities,
+  class_names: ["left", "middle", "right"],
+  average: [:micro, :macro],
+  title: "With both averages"
+)
+```
+
+Calibration takes the same matrix, one curve per class:
+
+```elixir
+EvalViz.calibration_curve(my, probabilities,
+  class_names: ["left", "middle", "right"],
+  bins: 5,
+  title: "Per-class calibration"
+)
+```
+
 ## Threshold
 
 Every other classification plot says how good the ranking is. This one answers

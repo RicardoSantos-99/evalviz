@@ -2,6 +2,7 @@ defmodule EvalViz.Curves do
   @moduledoc false
 
   alias EvalViz.Internal
+  alias EvalViz.Multiclass
   alias EvalViz.Theme
   alias Scholar.Metrics.Classification, as: Metrics
   alias VegaLite, as: Vl
@@ -11,6 +12,23 @@ defmodule EvalViz.Curves do
                  sample_weights: [
                    type: {:or, [{:list, {:or, [:float, :integer]}}, :any]},
                    doc: "Per-sample weights, as a list or rank-1 tensor."
+                 ],
+                 class_names: [
+                   type: {:list, {:or, [:string, :atom, :integer]}},
+                   doc: """
+                   Names for each class when `y_score` has one column per class.
+                   Defaults to `0..num_classes - 1`.
+                   """
+                 ],
+                 average: [
+                   type: {:or, [{:in, [:micro, :macro]}, {:list, {:in, [:micro, :macro]}}]},
+                   doc: """
+                   Averaged curves to draw alongside the per-class ones, for a
+                   `{n, num_classes}` score matrix. `:micro` pools every
+                   (sample, class) pair into one binary problem; `:macro`
+                   interpolates the per-class curves onto a shared grid and
+                   averages them. Accepts either or both.
+                   """
                  ],
                  chance_line: [
                    type: :boolean,
@@ -71,7 +89,7 @@ defmodule EvalViz.Curves do
     opts = NimbleOptions.validate!(opts, @opts_schema)
     config = config(kind)
 
-    curves = Enum.map(series, &curve_points(&1, config, opts))
+    curves = Enum.flat_map(series, &curves_for(&1, config, opts))
     multi? = length(curves) > 1
 
     values = Enum.flat_map(curves, & &1.points)
@@ -79,6 +97,13 @@ defmodule EvalViz.Curves do
     Vl.new(vl_opts(opts, curves, multi?))
     |> Vl.data_from_values(values)
     |> Vl.layers(layers(config, values, curves, multi?, opts))
+  end
+
+  defp curves_for(entry, config, opts) do
+    per_class = entry |> Multiclass.per_class(opts) |> Enum.map(&curve_points(&1, config, opts))
+    micro = entry |> Multiclass.micro(opts) |> Enum.map(&curve_points(&1, config, opts))
+
+    per_class ++ micro ++ macro(entry, per_class, config, opts)
   end
 
   defp curve_points({label, y_true, y_score}, config, opts) do
@@ -92,24 +117,83 @@ defmodule EvalViz.Curves do
     {x_field, _} = config.x
     {y_field, _} = config.y
 
-    legend = legend_label(label, config, y_true, y_score, dvi, weights)
+    {legend, summary} = legend_label(label, config, y_true, y_score, dvi, weights)
 
     points =
       x
       |> Internal.points(y, x_field, y_field)
       |> Enum.map(&Map.put(&1, "series", legend))
 
-    %{points: points, legend: legend, y_true: y_true}
+    %{points: points, legend: legend, y_true: y_true, summary: summary}
   end
 
-  defp legend_label(label, %{summary: nil}, _y_true, _score, _dvi, _weights), do: label
+  defp legend_label(label, %{summary: nil}, _y_true, _score, _dvi, _weights), do: {label, nil}
 
   defp legend_label(label, %{summary: {name, fun}}, y_true, score, dvi, weights) do
     value = fun.(y_true, score, dvi, weights) |> Nx.to_number() |> Float.round(3)
     summary = "#{name} = #{value}"
 
-    if label, do: "#{label} (#{summary})", else: summary
+    {if(label, do: "#{label} (#{summary})", else: summary), value}
   end
+
+  defp macro({label, _y_true, y_score}, per_class, config, opts) do
+    if Multiclass.macro?(y_score, opts), do: [macro_curve(label, per_class, config)], else: []
+  end
+
+  # Every per-class curve is resampled onto the union of their x values and the
+  # y values averaged there, which is how scikit-learn builds this curve.
+  defp macro_curve(label, per_class, config) do
+    {x_field, _} = config.x
+    {y_field, _} = config.y
+
+    curves = Enum.map(per_class, &as_curve(&1.points, x_field, y_field))
+    grid = curves |> Enum.concat() |> Enum.map(&elem(&1, 0)) |> Enum.uniq() |> Enum.sort()
+    legend = macro_legend(label, config, per_class)
+
+    points =
+      Enum.map(grid, fn x ->
+        %{
+          x_field => x,
+          y_field => mean(Enum.map(curves, &interpolate(&1, x))),
+          "series" => legend
+        }
+      end)
+
+    %{points: points, legend: legend, y_true: nil, summary: nil}
+  end
+
+  # Stable, so points repeating an x keep the order the curve gave them.
+  defp as_curve(points, x_field, y_field) do
+    points
+    |> Enum.map(&{&1[x_field], &1[y_field]})
+    |> Enum.sort_by(&elem(&1, 0))
+  end
+
+  # These are step curves, so an x can carry several y values. Landing on one
+  # takes the last, the top of the vertical segment; crossing it interpolates
+  # from the first. That is what numpy's interp does, and departing from it
+  # moves the averaged curve.
+  defp interpolate(points, x) do
+    {before, rest} = Enum.split_while(points, fn {px, _} -> px < x end)
+
+    case {List.last(before), rest} do
+      {_, [{^x, _} | _]} -> rest |> Enum.take_while(&(elem(&1, 0) == x)) |> List.last() |> elem(1)
+      {nil, [{_, y} | _]} -> y
+      {{_, y}, []} -> y
+      {{x0, y0}, [{x1, y1} | _]} -> y0 + (y1 - y0) * (x - x0) / (x1 - x0)
+    end
+  end
+
+  defp macro_legend(label, %{summary: nil}, _per_class) do
+    Multiclass.compose(label, "macro-average")
+  end
+
+  defp macro_legend(label, %{summary: {name, _fun}}, per_class) do
+    value = per_class |> Enum.map(& &1.summary) |> mean() |> Float.round(3)
+    "#{Multiclass.compose(label, "macro-average")} (#{name} = #{value})"
+  end
+
+  defp mean(values), do: Enum.sum(values) / length(values)
 
   defp layers(config, values, curves, multi?, opts) do
     {x_field, x_title} = config.x
@@ -154,10 +238,20 @@ defmodule EvalViz.Curves do
   end
 
   # For precision-recall, a no-skill classifier sits at the share of positives,
-  # so the baseline is a horizontal line rather than the diagonal.
+  # so the baseline is a horizontal line rather than the diagonal. One-vs-rest
+  # classes each have their own share, and a single line would misread as
+  # theirs, so it is only drawn when every curve agrees on it.
   defp build_chance_layer(:positive_rate, curves) do
-    rate = hd(curves).y_true |> Nx.mean() |> Nx.to_number()
-    reference_line([%{"x" => 0, "y" => rate}, %{"x" => 1, "y" => rate}])
+    rates =
+      curves
+      |> Enum.filter(& &1.y_true)
+      |> Enum.map(&(&1.y_true |> Nx.mean() |> Nx.to_number()))
+      |> Enum.uniq()
+
+    case rates do
+      [rate] -> reference_line([%{"x" => 0, "y" => rate}, %{"x" => 1, "y" => rate}])
+      _ -> nil
+    end
   end
 
   defp reference_line(points) do
@@ -178,8 +272,8 @@ defmodule EvalViz.Curves do
     unless distinct == [0] or distinct == [1] or distinct == [0, 1] do
       raise ArgumentError,
             "expected y_true to hold only 0 and 1, got #{inspect(distinct)}. " <>
-              "These curves are defined for binary classification; for a multiclass " <>
-              "model, plot one curve per class using a one-vs-rest y_true."
+              "For a multiclass model pass a y_score with one column per class, " <>
+              "and y_true as class indices."
     end
 
     :ok

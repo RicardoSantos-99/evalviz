@@ -2,10 +2,27 @@ defmodule EvalViz.Calibration do
   @moduledoc false
 
   alias EvalViz.Internal
+  alias EvalViz.Multiclass
   alias EvalViz.Theme
   alias VegaLite, as: Vl
 
   @opts_schema NimbleOptions.new!(
+                 class_names: [
+                   type: {:list, {:or, [:string, :atom, :integer]}},
+                   doc: """
+                   Names for each class when `y_prob` has one column per class.
+                   Defaults to `0..num_classes - 1`.
+                   """
+                 ],
+                 average: [
+                   type: {:in, [:micro]},
+                   doc: """
+                   Set to `:micro` to add a curve pooling every (sample, class)
+                   pair into one binary problem. There is no macro option: the
+                   per-class curves land on different bins, so averaging them
+                   would compare probabilities that were never comparable.
+                   """
+                 ],
                  bins: [
                    type: :pos_integer,
                    default: 10,
@@ -35,13 +52,17 @@ defmodule EvalViz.Calibration do
   def plot(series, opts) do
     opts = NimbleOptions.validate!(opts, @opts_schema)
 
-    curves = Enum.map(series, &curve(&1, opts))
+    curves = series |> Enum.flat_map(&expand(&1, opts)) |> Enum.map(&curve(&1, opts))
     multi? = length(curves) > 1
     values = Enum.flat_map(curves, & &1.points)
 
     Vl.new(vl_opts(opts))
     |> Vl.data_from_values(values)
     |> Vl.layers(layers(multi?, opts))
+  end
+
+  defp expand(entry, opts) do
+    Multiclass.per_class(entry, opts) ++ Multiclass.micro(entry, opts)
   end
 
   defp curve({label, y_true, y_prob}, opts) do

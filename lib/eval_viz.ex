@@ -73,6 +73,10 @@ defmodule EvalViz do
   positive class. To compare models, pass a list of `{label, y_true, y_score}`
   instead and every curve is drawn on the same axes.
 
+  For a multiclass model, pass `y_true` as class indices and `y_score` as a
+  `{num_samples, num_classes}` matrix. That draws one one-vs-rest curve per
+  class, and `:average` adds the micro or macro curve over them.
+
   ## Options
 
   #{NimbleOptions.docs(Curves.schema())}
@@ -84,6 +88,18 @@ defmodule EvalViz do
       iex> plot = EvalViz.roc_curve(y_true, scores)
       iex> VegaLite.to_spec(plot)["title"]["subtitle"]
       "AUC = 0.75"
+
+      iex> y_true = Nx.tensor([0, 1, 2, 0, 1, 2])
+      iex> scores =
+      ...>   Nx.tensor([
+      ...>     [0.7, 0.2, 0.1], [0.2, 0.6, 0.2], [0.1, 0.3, 0.6],
+      ...>     [0.6, 0.3, 0.1], [0.3, 0.5, 0.2], [0.2, 0.2, 0.6]
+      ...>   ])
+      iex> plot = EvalViz.roc_curve(y_true, scores, class_names: ["cat", "dog", "bird"])
+      iex> VegaLite.to_spec(plot)["data"]["values"]
+      ...> |> Enum.map(&(&1["series"]))
+      ...> |> Enum.uniq()
+      ["cat (AUC = 1.0)", "dog (AUC = 1.0)", "bird (AUC = 1.0)"]
 
       iex> y_true = Nx.tensor([0, 0, 1, 1])
       iex> logistic = Nx.tensor([0.1, 0.4, 0.35, 0.8])
@@ -111,8 +127,10 @@ defmodule EvalViz do
   @doc """
   Plots a precision-recall curve, with average precision shown in the legend.
 
-  Takes the same arguments as `roc_curve/3`. The dashed baseline sits at the
-  share of positives in `y_true`, which is what a no-skill classifier scores.
+  Takes the same arguments as `roc_curve/3`, multiclass included. The dashed
+  baseline sits at the share of positives in `y_true`, which is what a no-skill
+  classifier scores. One-vs-rest classes each have their own share, so the
+  baseline is only drawn when every curve on the plot agrees on it.
 
   ## Options
 
@@ -140,7 +158,7 @@ defmodule EvalViz do
   Plots a detection error tradeoff curve: false negative rate against false
   positive rate.
 
-  Takes the same arguments as `roc_curve/3`.
+  Takes the same arguments as `roc_curve/3`, multiclass included.
 
   ## Options
 
@@ -264,6 +282,11 @@ defmodule EvalViz do
   called 70% likely, roughly 70% turned out positive. Takes the same shapes as
   `roc_curve/3`, so a list of `{label, y_true, y_prob}` compares models.
 
+  A `{num_samples, num_classes}` `y_prob` gives one one-vs-rest curve per class.
+  `:average` accepts only `:micro` here: the per-class curves land on different
+  bins, so a macro average would compare probabilities that were never
+  comparable.
+
   Unlike the ranking curves, this one needs real probabilities rather than
   arbitrary scores.
 
@@ -340,6 +363,10 @@ defmodule EvalViz do
   Every other classification plot here answers how good the ranking is. This one
   answers the question that follows: given that ranking, where do you cut? The
   dashed rule marks the threshold with the highest F1.
+
+  A `{num_samples, num_classes}` `y_score` gives one one-vs-rest set of curves
+  per class, with colour carrying the class and the dash pattern the metric. The
+  best-F1 rule is left out there, since each class peaks somewhere different.
 
   ## Options
 
