@@ -16,9 +16,9 @@ else.
 Early development. Not published to Hex yet.
 
 - [x] Confusion matrix
-- [ ] ROC curve
-- [ ] Precision-recall curve
-- [ ] DET curve
+- [x] ROC curve
+- [x] Precision-recall curve
+- [x] DET curve
 
 ## Usage
 
@@ -38,6 +38,26 @@ EvalViz.confusion_matrix(y_true, y_pred,
   normalize: :true_class
 )
 |> VegaLite.title("Validation set")
+```
+
+### Curves
+
+Pass the score your model gave the positive class:
+
+```elixir
+EvalViz.roc_curve(y_true, scores)
+EvalViz.precision_recall_curve(y_true, scores)
+EvalViz.det_curve(y_true, scores)
+```
+
+To compare models, pass a list and every curve lands on the same axes, with
+AUC (or average precision) in the legend:
+
+```elixir
+EvalViz.roc_curve([
+  {"Logistic", y_true, logistic_scores},
+  {"Naive Bayes", y_true, nb_scores}
+])
 ```
 
 ## License
