@@ -229,6 +229,18 @@ defmodule EvalViz.MulticlassTest do
       assert encoding["color"]["scale"]["domain"] == ["0", "1", "2"]
     end
 
+    test "gives the dash legend a swatch that shows the pattern" do
+      legend =
+        EvalViz.threshold_curve(y_true(), scores())
+        |> spec()
+        |> get_in(["layer"])
+        |> List.last()
+        |> get_in(["encoding", "strokeDash", "legend"])
+
+      assert legend["symbolFillColor"] == "transparent"
+      assert legend["symbolStrokeColor"]
+    end
+
     test "leaves the best-F1 rule out, since each class peaks somewhere else" do
       plot = EvalViz.threshold_curve(y_true(), scores())
 

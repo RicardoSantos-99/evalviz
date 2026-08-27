@@ -12,6 +12,7 @@ defmodule EvalViz.Theme do
   @secondary "#f58518"
   @muted "#b0b0b0"
   @reference "#999999"
+  @symbol "#4a4a4a"
 
   # Vega's category10, ordered so neighbouring clusters stay distinguishable.
   @categorical [
@@ -61,4 +62,16 @@ defmodule EvalViz.Theme do
   sequential ramp would hide the sign.
   """
   def diverging_scheme, do: "blueorange"
+
+  @doc """
+  Legend options for a dash-pattern channel.
+
+  Its swatch has to show the pattern rather than a colour, and the default
+  filled dot shows neither: every entry comes out an identical blob. Outlining
+  the swatch and leaving it hollow lets the dash through. A `symbol_type` of
+  `"stroke"` would read better still, but renders nothing at all here.
+  """
+  def dash_legend do
+    [symbol_stroke_color: @symbol, symbol_stroke_width: 2, symbol_fill_color: "transparent"]
+  end
 end

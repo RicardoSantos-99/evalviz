@@ -195,6 +195,36 @@ EvalViz.learning_curve(
 )
 ```
 
+## Comparing models
+
+One learning curve says whether more data would help. Two say which model is
+still getting better as the data grows, which is a different question and often
+the one that decides.
+
+```elixir
+EvalViz.learning_curve(
+  [20, 50, 100, 200, 400],
+  [
+    {"Linear", [[0.72, 0.70], [0.74, 0.73], [0.75, 0.74], [0.75, 0.75], [0.76, 0.75]],
+     [[0.60, 0.58], [0.68, 0.66], [0.72, 0.71], [0.74, 0.73], [0.75, 0.74]]},
+    {"Forest", [[1.00, 0.99], [0.99, 0.99], [0.98, 0.98], [0.97, 0.97], [0.96, 0.96]],
+     [[0.55, 0.52], [0.68, 0.65], [0.78, 0.76], [0.84, 0.83], [0.88, 0.87]]}
+  ],
+  title: "Which one wants more data?"
+)
+```
+
+Colour carries the model and the dash pattern carries training against
+validation, so both readings survive at once. Linear flattens by 100 examples
+and Forest is still climbing at 400.
+
+The regression plots take a list too, shown further down.
+
+The threshold curve is the one plot that takes no list of models. Colour and
+dash are already spent there on class and metric, and it exists to tune one
+model's cut-off rather than to compare models: for that, ROC and
+precision-recall already overlay as many as you like.
+
 ## Model selection
 
 The learning curve asks whether more data would help. These work with the data
@@ -501,6 +531,26 @@ bad_fit = Scholar.Linear.LinearRegression.fit(feature, curved)
 bad_pred = Scholar.Linear.LinearRegression.predict(bad_fit, feature)
 
 EvalViz.residuals(curved, bad_pred, title: "Linear fit on quadratic data")
+```
+
+Both regression plots also take a list of models, which puts them on one set of
+axes and one reference line, so the comparison is not two pictures with
+different scales.
+
+```elixir
+shrunk = Nx.add(Nx.multiply(predicted, 0.85), 2.0)
+
+EvalViz.predicted_vs_actual(
+  [{"Linear", target, predicted}, {"Shrunk", target, shrunk}],
+  title: "Two models, one diagonal"
+)
+```
+
+```elixir
+EvalViz.residuals(
+  [{"Linear", target, predicted}, {"Shrunk", target, shrunk}],
+  title: "Two models, one zero line"
+)
 ```
 
 The scatter above shows where a pattern is left. These two show the shape of

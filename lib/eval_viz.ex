@@ -544,6 +544,10 @@ defmodule EvalViz do
   Both axes share one range, so distance from the diagonal reads directly as
   error rather than being distorted by two different scales.
 
+  To compare models, pass a list of `{label, y_true, y_pred}` instead. Every
+  model lands on the same axes and the same diagonal, which is what makes the
+  distances comparable.
+
   ## Options
 
   #{NimbleOptions.docs(Regression.schema())}
@@ -555,9 +559,26 @@ defmodule EvalViz do
       iex> plot = EvalViz.predicted_vs_actual(y_true, y_pred)
       iex> VegaLite.to_spec(plot)["data"]["values"] |> Enum.map(&(&1["actual"]))
       [1.0, 2.0, 3.0]
+
+      iex> y_true = Nx.tensor([1.0, 2.0, 3.0])
+      iex> plot =
+      ...>   EvalViz.predicted_vs_actual([
+      ...>     {"Linear", y_true, Nx.tensor([1.1, 1.9, 3.2])},
+      ...>     {"Ridge", y_true, Nx.tensor([1.3, 2.2, 2.8])}
+      ...>   ])
+      iex> VegaLite.to_spec(plot)["data"]["values"]
+      ...> |> Enum.map(&(&1["series"]))
+      ...> |> Enum.uniq()
+      ["Linear", "Ridge"]
   """
-  def predicted_vs_actual(y_true, y_pred, opts \\ []) do
-    Regression.predicted_vs_actual(y_true, y_pred, opts)
+  def predicted_vs_actual(series_or_y_true, y_pred_or_opts \\ [], opts \\ [])
+
+  def predicted_vs_actual(series, opts, _) when is_list(series) and is_list(opts) do
+    Regression.predicted_vs_actual(normalize_series(series), opts)
+  end
+
+  def predicted_vs_actual(y_true, y_pred, opts) do
+    Regression.predicted_vs_actual([{nil, y_true, y_pred}], opts)
   end
 
   @doc """
@@ -565,6 +586,9 @@ defmodule EvalViz do
 
   Points scattered evenly around zero mean the model has no systematic bias
   left; a curve or a widening fan means it has.
+
+  Takes the same shapes as `predicted_vs_actual/3`, so a list of
+  `{label, y_true, y_pred}` puts several models on one zero line.
 
   ## Options
 
@@ -578,8 +602,14 @@ defmodule EvalViz do
       iex> VegaLite.to_spec(plot)["data"]["values"] |> Enum.map(&(&1["residual"]))
       [0.5, 0.0, -1.0]
   """
-  def residuals(y_true, y_pred, opts \\ []) do
-    Regression.residuals(y_true, y_pred, opts)
+  def residuals(series_or_y_true, y_pred_or_opts \\ [], opts \\ [])
+
+  def residuals(series, opts, _) when is_list(series) and is_list(opts) do
+    Regression.residuals(normalize_series(series), opts)
+  end
+
+  def residuals(y_true, y_pred, opts) do
+    Regression.residuals([{nil, y_true, y_pred}], opts)
   end
 
   @doc """
@@ -640,6 +670,11 @@ defmodule EvalViz do
   A `{num_samples, num_classes}` `y_score` gives one one-vs-rest set of curves
   per class, with colour carrying the class and the dash pattern the metric. The
   best-F1 rule is left out there, since each class peaks somewhere different.
+
+  Unlike the other plots here this one takes no list of models. Colour and dash
+  are already spent on class and metric, and a third model dimension has no
+  channel left to read from. Comparing models is what `roc_curve/3` and
+  `precision_recall_curve/3` are for; this one tunes the cut-off of one model.
 
   ## Options
 
@@ -713,6 +748,11 @@ defmodule EvalViz do
   training size, or one per fold, in which case the mean is drawn with a band
   one standard deviation wide.
 
+  To compare models, pass a list of `{label, train_scores, validation_scores}`
+  in place of the two score arguments. Colour then carries the model and the
+  dash pattern carries training against validation, so both readings survive.
+  Consider `spread: false` there, since every model shades twice.
+
   ## Options
 
   #{NimbleOptions.docs(LearningCurve.schema())}
@@ -727,9 +767,26 @@ defmodule EvalViz do
       ...> |> Enum.map(&(&1["series"]))
       ...> |> Enum.uniq()
       ["Training", "Validation"]
+
+      iex> sizes = [10, 20, 40]
+      iex> plot =
+      ...>   EvalViz.learning_curve(sizes, [
+      ...>     {"Linear", [0.9, 0.9, 0.9], [0.7, 0.8, 0.85]},
+      ...>     {"Forest", [1.0, 1.0, 1.0], [0.6, 0.75, 0.88]}
+      ...>   ])
+      iex> VegaLite.to_spec(plot)["data"]["values"]
+      ...> |> Enum.map(&(&1["model"]))
+      ...> |> Enum.uniq()
+      ["Linear", "Forest"]
   """
-  def learning_curve(train_sizes, train_scores, validation_scores, opts \\ []) do
-    LearningCurve.plot(train_sizes, train_scores, validation_scores, opts)
+  def learning_curve(train_sizes, series_or_train, validation_or_opts \\ [], opts \\ [])
+
+  def learning_curve(train_sizes, [{_, _, _} | _] = series, opts, _) when is_list(opts) do
+    LearningCurve.plot(train_sizes, normalize_series(series), opts)
+  end
+
+  def learning_curve(train_sizes, train_scores, validation_scores, opts) do
+    LearningCurve.plot(train_sizes, [{nil, train_scores, validation_scores}], opts)
   end
 
   @doc """

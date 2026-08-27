@@ -35,6 +35,7 @@ Early development. Not published to Hex yet.
 - [x] Residual histogram and normal Q-Q
 - [x] Validation curve, grid search heatmap, per-fold scores
 - [x] One-call report, and a grid to compose any plots
+- [x] Model comparison across curves, calibration, regression and learning curves
 
 ## Trying it
 
@@ -247,6 +248,23 @@ same split scikit-learn draws between computing a learning curve and displaying
 one. Give it a score per fold and the mean is drawn with a band one standard
 deviation wide.
 
+Comparing models works here too, and answers a question one curve cannot: which
+model is still getting better as the data grows.
+
+```elixir
+EvalViz.learning_curve(sizes, [
+  {"Linear", linear_train, linear_validation},
+  {"Forest", forest_train, forest_validation}
+])
+```
+
+Colour then carries the model and the dash pattern carries training against
+validation, so both readings survive at once.
+
+The threshold curve is the one plot that takes no list of models: colour and
+dash are already spent on class and metric there, and it exists to tune one
+model's cut-off rather than to compare models.
+
 ### Model selection
 
 The learning curve asks whether more data would help. These three work with the
@@ -303,6 +321,16 @@ EvalViz.predicted_vs_actual(y_true, y_pred)
 EvalViz.residuals(y_true, y_pred)
 EvalViz.residual_distribution(y_true, y_pred)
 EvalViz.qq_plot(Nx.subtract(y_pred, y_true))
+```
+
+The first two also take a list of models, which puts them on one set of axes
+and one reference line:
+
+```elixir
+EvalViz.residuals([
+  {"Linear", y_true, linear_pred},
+  {"Ridge", y_true, ridge_pred}
+])
 ```
 
 `residuals/3` shows the residuals against the prediction, which is where a

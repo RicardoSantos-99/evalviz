@@ -149,6 +149,7 @@ defmodule EvalViz.Threshold do
     |> Vl.encode_field(:stroke_dash, "metric",
       type: :nominal,
       title: nil,
+      legend: Theme.dash_legend(),
       scale: [domain: metric_names]
     )
   end

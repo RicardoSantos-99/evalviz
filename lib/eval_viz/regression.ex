@@ -22,19 +22,17 @@ defmodule EvalViz.Regression do
 
   def schema, do: @opts_schema
 
-  def predicted_vs_actual(y_true, y_pred, opts) do
+  def predicted_vs_actual(series, opts) do
     opts = NimbleOptions.validate!(opts, @opts_schema)
-    Internal.assert_paired!(y_true, y_pred, "y_true", "y_pred")
-
-    values = Internal.points(y_true, y_pred, "actual", "predicted")
+    values = rows(series, &Internal.points(&1, &2, "actual", "predicted"))
 
     # Both axes carry the same quantity, so they share one range: otherwise the
     # diagonal stops meaning "perfect" and the eye reads the spread wrong.
     domain = shared_domain(values, ["actual", "predicted"])
 
     scatter =
-      Vl.new()
-      |> Vl.mark(:point, filled: true, opacity: 0.6, size: opts[:point_size], tooltip: true)
+      values
+      |> scatter(opts)
       |> Vl.encode_field(:x, "actual",
         type: :quantitative,
         title: "Actual",
@@ -46,41 +44,65 @@ defmodule EvalViz.Regression do
         scale: [domain: domain, nice: false]
       )
 
-    layers =
-      if opts[:reference_line] do
-        [diagonal(domain), scatter]
-      else
-        [scatter]
-      end
+    layers = if opts[:reference_line], do: [diagonal(domain), scatter], else: [scatter]
 
     Vl.new(vl_opts(opts))
     |> Vl.data_from_values(values)
     |> Vl.layers(layers)
   end
 
-  def residuals(y_true, y_pred, opts) do
+  def residuals(series, opts) do
     opts = NimbleOptions.validate!(opts, @opts_schema)
-    Internal.assert_paired!(y_true, y_pred, "y_true", "y_pred")
 
-    residuals = Nx.subtract(y_pred, y_true)
-    values = Internal.points(y_pred, residuals, "predicted", "residual")
+    values =
+      rows(series, fn y_true, y_pred ->
+        Internal.points(y_pred, Nx.subtract(y_pred, y_true), "predicted", "residual")
+      end)
 
     scatter =
-      Vl.new()
-      |> Vl.mark(:point, filled: true, opacity: 0.6, size: opts[:point_size], tooltip: true)
+      values
+      |> scatter(opts)
       |> Vl.encode_field(:x, "predicted", type: :quantitative, title: "Predicted")
       |> Vl.encode_field(:y, "residual", type: :quantitative, title: "Residual")
 
-    layers =
-      if opts[:reference_line] do
-        [zero_line(), scatter]
-      else
-        [scatter]
-      end
+    layers = if opts[:reference_line], do: [zero_line(), scatter], else: [scatter]
 
     Vl.new(vl_opts(opts))
     |> Vl.data_from_values(values)
     |> Vl.layers(layers)
+  end
+
+  # One flat set of rows over every model, so they share the axes and the eye
+  # compares distance from the same reference line.
+  defp rows(series, build) do
+    Enum.flat_map(series, fn {label, y_true, y_pred} ->
+      Internal.assert_paired!(y_true, y_pred, "y_true", "y_pred")
+      points = build.(y_true, y_pred)
+
+      if label, do: Enum.map(points, &Map.put(&1, "series", label)), else: points
+    end)
+  end
+
+  defp scatter(values, opts) do
+    layer =
+      Vl.new()
+      |> Vl.mark(:point, filled: true, opacity: 0.6, size: opts[:point_size], tooltip: true)
+
+    case labels(values) do
+      [] -> layer
+      names -> encode_series(layer, names)
+    end
+  end
+
+  defp labels(values),
+    do: values |> Enum.map(& &1["series"]) |> Enum.uniq() |> Enum.reject(&is_nil/1)
+
+  defp encode_series(layer, names) do
+    Vl.encode_field(layer, :color, "series",
+      type: :nominal,
+      title: nil,
+      scale: [domain: names, range: Theme.categorical(length(names))]
+    )
   end
 
   defp diagonal([min, max]) do
