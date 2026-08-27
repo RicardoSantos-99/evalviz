@@ -5,8 +5,16 @@ defmodule EvalViz do
   Every function returns a `VegaLite` specification, which Livebook renders on
   its own and which you can keep customising through the `VegaLite` API:
 
-      EvalViz.confusion_matrix(y_true, y_pred, num_classes: 3, title: "Validation set")
-      |> VegaLite.config(axis: [grid: false])
+      iex> y_true = Nx.tensor([0, 0, 1, 1])
+      iex> y_pred = Nx.tensor([0, 1, 1, 1])
+      iex> EvalViz.confusion_matrix(y_true, y_pred, num_classes: 2, title: "Validation set")
+      ...> |> VegaLite.config(axis: [grid: false])
+      ...> |> VegaLite.to_spec()
+      ...> |> get_in(["config", "axis", "grid"])
+      false
+
+  Rendering them in Livebook needs `kino_vega_lite`: the `Kino.Render`
+  implementation for `VegaLite` lives there rather than in `kino`.
 
   Nothing here assumes a particular modelling library. Pass the tensors your
   model produced and the plot follows, whether they came from Scholar, Axon or
@@ -19,6 +27,7 @@ defmodule EvalViz do
   alias EvalViz.Dendrogram
   alias EvalViz.Regression
   alias EvalViz.Scree
+  alias EvalViz.Threshold
   alias EvalViz.Silhouette
 
   @doc """
@@ -32,15 +41,25 @@ defmodule EvalViz do
 
   ## Examples
 
-      y_true = Nx.tensor([0, 0, 1, 1, 2, 2])
-      y_pred = Nx.tensor([0, 1, 0, 2, 2, 2])
-      EvalViz.confusion_matrix(y_true, y_pred, num_classes: 3)
+      iex> y_true = Nx.tensor([0, 0, 1, 1, 2, 2])
+      iex> y_pred = Nx.tensor([0, 1, 0, 2, 2, 2])
+      iex> plot = EvalViz.confusion_matrix(y_true, y_pred, num_classes: 3)
+      iex> VegaLite.to_spec(plot)["data"]["values"] |> length()
+      9
 
-      EvalViz.confusion_matrix(y_true, y_pred,
-        num_classes: 3,
-        class_names: ["cat", "dog", "bird"],
-        normalize: :true_class
-      )
+      iex> y_true = Nx.tensor([0, 0, 1, 1, 2, 2])
+      iex> y_pred = Nx.tensor([0, 1, 0, 2, 2, 2])
+      iex> plot =
+      ...>   EvalViz.confusion_matrix(y_true, y_pred,
+      ...>     num_classes: 3,
+      ...>     class_names: ["cat", "dog", "bird"],
+      ...>     normalize: :true_class
+      ...>   )
+      iex> VegaLite.to_spec(plot)["data"]["values"]
+      ...> |> Enum.filter(&(&1["actual"] == "bird"))
+      ...> |> Enum.map(&(&1["value"]))
+      ...> |> Enum.sum()
+      1.0
   """
   def confusion_matrix(y_true, y_pred, opts \\ []) do
     ConfusionMatrix.plot(y_true, y_pred, opts)
@@ -59,12 +78,24 @@ defmodule EvalViz do
 
   ## Examples
 
-      EvalViz.roc_curve(y_true, scores)
+      iex> y_true = Nx.tensor([0, 0, 1, 1])
+      iex> scores = Nx.tensor([0.1, 0.4, 0.35, 0.8])
+      iex> plot = EvalViz.roc_curve(y_true, scores)
+      iex> VegaLite.to_spec(plot)["title"]["subtitle"]
+      "AUC = 0.75"
 
-      EvalViz.roc_curve([
-        {"Logistic", y_true, logistic_scores},
-        {"Naive Bayes", y_true, nb_scores}
-      ])
+      iex> y_true = Nx.tensor([0, 0, 1, 1])
+      iex> logistic = Nx.tensor([0.1, 0.4, 0.35, 0.8])
+      iex> naive_bayes = Nx.tensor([0.2, 0.3, 0.6, 0.9])
+      iex> plot =
+      ...>   EvalViz.roc_curve([
+      ...>     {"Logistic", y_true, logistic},
+      ...>     {"Naive Bayes", y_true, naive_bayes}
+      ...>   ])
+      iex> VegaLite.to_spec(plot)["data"]["values"]
+      ...> |> Enum.map(&(&1["series"]))
+      ...> |> Enum.uniq()
+      ["Logistic (AUC = 0.75)", "Naive Bayes (AUC = 1.0)"]
   """
   def roc_curve(series_or_y_true, y_score_or_opts \\ [], opts \\ [])
 
@@ -85,6 +116,14 @@ defmodule EvalViz do
   ## Options
 
   #{NimbleOptions.docs(Curves.schema())}
+
+  ## Examples
+
+      iex> y_true = Nx.tensor([0, 0, 1, 1])
+      iex> scores = Nx.tensor([0.1, 0.4, 0.35, 0.8])
+      iex> plot = EvalViz.precision_recall_curve(y_true, scores)
+      iex> VegaLite.to_spec(plot)["data"]["values"] |> Enum.map(&(&1["recall"]))
+      [1.0, 1.0, 0.5, 0.5, 0.0]
   """
   def precision_recall_curve(series_or_y_true, y_score_or_opts \\ [], opts \\ [])
 
@@ -105,6 +144,14 @@ defmodule EvalViz do
   ## Options
 
   #{NimbleOptions.docs(Curves.schema())}
+
+  ## Examples
+
+      iex> y_true = Nx.tensor([0, 0, 1, 1])
+      iex> scores = Nx.tensor([0.1, 0.4, 0.35, 0.8])
+      iex> plot = EvalViz.det_curve(y_true, scores)
+      iex> VegaLite.to_spec(plot)["data"]["values"] |> Enum.map(&(&1["fnr"]))
+      [0.0, 0.0, 0.5, 0.5]
   """
   def det_curve(series_or_y_true, y_score_or_opts \\ [], opts \\ [])
 
@@ -129,13 +176,27 @@ defmodule EvalViz do
 
   ## Examples
 
-      model = Scholar.Cluster.Hierarchical.fit(data)
-      EvalViz.dendrogram(model)
+      iex> data = Nx.tensor([[1.0], [1.5], [5.0], [5.4], [9.0]])
+      iex> model = Scholar.Cluster.Hierarchical.fit(data, linkage: :single)
+      iex> plot = EvalViz.dendrogram(model)
+      iex> VegaLite.to_spec(plot)["data"]["values"]
+      ...> |> Enum.map(&(&1["link"]))
+      ...> |> Enum.uniq()
+      ...> |> length()
+      4
 
-      EvalViz.dendrogram(model,
-        labels: ["a", "b", "c", "d", "e"],
-        color_threshold: 2.0
-      )
+      iex> data = Nx.tensor([[1.0], [1.5], [5.0], [5.4], [9.0]])
+      iex> model = Scholar.Cluster.Hierarchical.fit(data, linkage: :single)
+      iex> plot =
+      ...>   EvalViz.dendrogram(model,
+      ...>     labels: ["a", "b", "c", "d", "e"],
+      ...>     color_threshold: 2.0
+      ...>   )
+      iex> VegaLite.to_spec(plot)["data"]["values"]
+      ...> |> Enum.map(&(&1["cluster"]))
+      ...> |> Enum.uniq()
+      ...> |> Enum.sort()
+      ["Above cut", "Cluster 1", "Cluster 2"]
   """
   def dendrogram(model_or_pair, opts \\ [])
 
@@ -161,7 +222,11 @@ defmodule EvalViz do
 
   ## Examples
 
-      EvalViz.silhouette(x, labels, num_clusters: 3)
+      iex> x = Nx.tensor([[0, 0], [1, 0], [1, 1], [3, 3], [4, 4.5]])
+      iex> labels = Nx.tensor([0, 0, 0, 1, 1])
+      iex> plot = EvalViz.silhouette(x, labels, num_clusters: 2)
+      iex> VegaLite.to_spec(plot)["data"]["values"] |> length()
+      5
   """
   def silhouette(x, labels, opts \\ []) do
     Silhouette.plot(x, labels, opts)
@@ -180,8 +245,10 @@ defmodule EvalViz do
 
   ## Examples
 
-      pca = Scholar.Decomposition.PCA.fit(x, num_components: 4)
-      EvalViz.scree(pca)
+      iex> plot = EvalViz.scree(Nx.tensor([0.6, 0.25, 0.1, 0.05]))
+      iex> VegaLite.to_spec(plot)["data"]["values"]
+      ...> |> Enum.map(&Float.round(&1["cumulative"], 4))
+      [0.6, 0.85, 0.95, 1.0]
   """
   def scree(model_or_ratios, opts \\ [])
 
@@ -205,7 +272,11 @@ defmodule EvalViz do
 
   ## Examples
 
-      EvalViz.calibration_curve(y_true, probabilities, bins: 5)
+      iex> y_true = Nx.tensor([0, 0, 1, 1, 0, 1])
+      iex> probabilities = Nx.tensor([0.1, 0.2, 0.8, 0.9, 0.3, 0.7], type: :f64)
+      iex> plot = EvalViz.calibration_curve(y_true, probabilities, bins: 2)
+      iex> VegaLite.to_spec(plot)["data"]["values"] |> Enum.map(&(&1["observed"]))
+      [0.0, 1.0]
   """
   def calibration_curve(series_or_y_true, y_prob_or_opts \\ [], opts \\ [])
 
@@ -230,7 +301,11 @@ defmodule EvalViz do
 
   ## Examples
 
-      EvalViz.predicted_vs_actual(y_true, y_pred)
+      iex> y_true = Nx.tensor([1.0, 2.0, 3.0])
+      iex> y_pred = Nx.tensor([1.1, 1.9, 3.2])
+      iex> plot = EvalViz.predicted_vs_actual(y_true, y_pred)
+      iex> VegaLite.to_spec(plot)["data"]["values"] |> Enum.map(&(&1["actual"]))
+      [1.0, 2.0, 3.0]
   """
   def predicted_vs_actual(y_true, y_pred, opts \\ []) do
     Regression.predicted_vs_actual(y_true, y_pred, opts)
@@ -248,10 +323,45 @@ defmodule EvalViz do
 
   ## Examples
 
-      EvalViz.residuals(y_true, y_pred)
+      iex> y_true = Nx.tensor([1.0, 2.0, 3.0])
+      iex> y_pred = Nx.tensor([1.5, 2.0, 2.0])
+      iex> plot = EvalViz.residuals(y_true, y_pred)
+      iex> VegaLite.to_spec(plot)["data"]["values"] |> Enum.map(&(&1["residual"]))
+      [0.5, 0.0, -1.0]
   """
   def residuals(y_true, y_pred, opts \\ []) do
     Regression.residuals(y_true, y_pred, opts)
+  end
+
+  @doc """
+  Plots precision, recall and F1 against the decision threshold.
+
+  Every other classification plot here answers how good the ranking is. This one
+  answers the question that follows: given that ranking, where do you cut? The
+  dashed rule marks the threshold with the highest F1.
+
+  ## Options
+
+  #{NimbleOptions.docs(Threshold.schema())}
+
+  ## Examples
+
+      iex> y_true = Nx.tensor([0, 0, 1, 1])
+      iex> scores = Nx.tensor([0.1, 0.4, 0.35, 0.8])
+      iex> plot = EvalViz.threshold_curve(y_true, scores)
+      iex> VegaLite.to_spec(plot)["data"]["values"]
+      ...> |> Enum.map(&(&1["metric"]))
+      ...> |> Enum.uniq()
+      ["Precision", "Recall", "F1"]
+
+      iex> y_true = Nx.tensor([0, 0, 1, 1])
+      iex> scores = Nx.tensor([0.1, 0.4, 0.35, 0.8])
+      iex> plot = EvalViz.threshold_curve(y_true, scores, metrics: [:precision, :recall])
+      iex> VegaLite.to_spec(plot)["layer"] |> length()
+      1
+  """
+  def threshold_curve(y_true, y_score, opts \\ []) do
+    Threshold.plot(y_true, y_score, opts)
   end
 
   defp normalize_series(series) do

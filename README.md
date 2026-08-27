@@ -24,6 +24,7 @@ Early development. Not published to Hex yet.
 - [x] PCA scree plot
 - [x] Calibration curve
 - [x] Residuals and predicted vs actual
+- [x] Threshold curve
 
 ## Trying it
 
@@ -105,6 +106,18 @@ EvalViz.silhouette(x, labels, num_clusters: 3)
 pca = Scholar.Decomposition.PCA.fit(x, num_components: 6)
 EvalViz.scree(pca)
 ```
+
+### Threshold
+
+Every other classification plot says how good the ranking is. This one answers
+what follows: given that ranking, where do you cut?
+
+```elixir
+EvalViz.threshold_curve(y_true, scores)
+```
+
+Precision, recall and F1 against the decision threshold, with the best F1
+marked.
 
 ### Calibration
 
