@@ -20,6 +20,8 @@ Early development. Not published to Hex yet.
 - [x] Precision-recall curve
 - [x] DET curve
 - [x] Dendrogram
+- [x] Silhouette plot
+- [x] PCA scree plot
 
 ## Usage
 
@@ -77,6 +79,15 @@ cluster and leaves the links above it grey, which is the height you would cut
 the tree at to read clusters off the plot.
 
 Leaf order and bracket coordinates match `scipy.cluster.hierarchy.dendrogram`.
+
+### Clustering and decomposition
+
+```elixir
+EvalViz.silhouette(x, labels, num_clusters: 3)
+
+pca = Scholar.Decomposition.PCA.fit(x, num_components: 6)
+EvalViz.scree(pca)
+```
 
 ## License
 

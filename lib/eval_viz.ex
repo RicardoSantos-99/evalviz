@@ -16,6 +16,8 @@ defmodule EvalViz do
   alias EvalViz.ConfusionMatrix
   alias EvalViz.Curves
   alias EvalViz.Dendrogram
+  alias EvalViz.Scree
+  alias EvalViz.Silhouette
 
   @doc """
   Plots a confusion matrix as a heatmap with the value written in each cell.
@@ -142,6 +144,47 @@ defmodule EvalViz do
   def dendrogram({clades, heights}, opts) do
     Dendrogram.plot(clades, heights, opts)
   end
+
+  @doc """
+  Plots a silhouette diagram: one bar per point, grouped by cluster and sorted
+  within it.
+
+  `x` is the data that was clustered and `labels` the cluster each point landed
+  in. Wide, evenly tall blocks mean a clean clustering; bars that taper early,
+  or run negative, mark points that sit closer to a neighbouring cluster.
+
+  ## Options
+
+  #{NimbleOptions.docs(Silhouette.schema())}
+
+  ## Examples
+
+      EvalViz.silhouette(x, labels, num_clusters: 3)
+  """
+  def silhouette(x, labels, opts \\ []) do
+    Silhouette.plot(x, labels, opts)
+  end
+
+  @doc """
+  Plots a scree chart of the variance each principal component explains, with
+  the running total overlaid.
+
+  Accepts a `Scholar.Decomposition.PCA` model or a rank-1 tensor of explained
+  variance ratios.
+
+  ## Options
+
+  #{NimbleOptions.docs(Scree.schema())}
+
+  ## Examples
+
+      pca = Scholar.Decomposition.PCA.fit(x, num_components: 4)
+      EvalViz.scree(pca)
+  """
+  def scree(model_or_ratios, opts \\ [])
+
+  def scree(%{explained_variance_ratio: ratios}, opts), do: Scree.plot(ratios, opts)
+  def scree(ratios, opts), do: Scree.plot(ratios, opts)
 
   defp normalize_series(series) do
     Enum.map(series, fn
