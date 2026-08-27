@@ -15,6 +15,7 @@ defmodule EvalViz do
 
   alias EvalViz.ConfusionMatrix
   alias EvalViz.Curves
+  alias EvalViz.Dendrogram
 
   @doc """
   Plots a confusion matrix as a heatmap with the value written in each cell.
@@ -109,6 +110,37 @@ defmodule EvalViz do
 
   def det_curve(y_true, y_score, opts) do
     Curves.plot(:det, [{nil, y_true, y_score}], opts)
+  end
+
+  @doc """
+  Plots a dendrogram of an agglomerative clustering.
+
+  Accepts a `Scholar.Cluster.Hierarchical` model, or a `{clades, heights}` pair
+  of tensors shaped `{n - 1, 2}` and `{n - 1}` for anything that produces the
+  same merge structure.
+
+  ## Options
+
+  #{NimbleOptions.docs(Dendrogram.schema())}
+
+  ## Examples
+
+      model = Scholar.Cluster.Hierarchical.fit(data)
+      EvalViz.dendrogram(model)
+
+      EvalViz.dendrogram(model,
+        labels: ["a", "b", "c", "d", "e"],
+        color_threshold: 2.0
+      )
+  """
+  def dendrogram(model_or_pair, opts \\ [])
+
+  def dendrogram(%{clades: clades, dissimilarities: heights}, opts) do
+    Dendrogram.plot(clades, heights, opts)
+  end
+
+  def dendrogram({clades, heights}, opts) do
+    Dendrogram.plot(clades, heights, opts)
   end
 
   defp normalize_series(series) do

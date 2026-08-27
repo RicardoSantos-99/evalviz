@@ -19,6 +19,7 @@ Early development. Not published to Hex yet.
 - [x] ROC curve
 - [x] Precision-recall curve
 - [x] DET curve
+- [x] Dendrogram
 
 ## Usage
 
@@ -59,6 +60,23 @@ EvalViz.roc_curve([
   {"Naive Bayes", y_true, nb_scores}
 ])
 ```
+
+### Dendrogram
+
+```elixir
+model = Scholar.Cluster.Hierarchical.fit(data)
+
+EvalViz.dendrogram(model,
+  labels: ["alpha", "bravo", "charlie"],
+  color_threshold: 1.0
+)
+```
+
+`color_threshold` colours each subtree that merges below that height as its own
+cluster and leaves the links above it grey, which is the height you would cut
+the tree at to read clusters off the plot.
+
+Leaf order and bracket coordinates match `scipy.cluster.hierarchy.dendrogram`.
 
 ## License
 
