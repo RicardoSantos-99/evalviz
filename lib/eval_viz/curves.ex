@@ -75,7 +75,7 @@ defmodule EvalViz.Curves do
 
     values = Enum.flat_map(curves, & &1.points)
 
-    Vl.new(vl_opts(opts))
+    Vl.new(vl_opts(opts, curves, multi?))
     |> Vl.data_from_values(values)
     |> Vl.layers(layers(config, values, curves, multi?, opts))
   end
@@ -105,7 +105,9 @@ defmodule EvalViz.Curves do
 
   defp legend_label(label, %{summary: {name, fun}}, y_true, score, dvi, weights) do
     value = fun.(y_true, score, dvi, weights) |> Nx.to_number() |> Float.round(3)
-    "#{label} (#{name} = #{value})"
+    summary = "#{name} = #{value}"
+
+    if label, do: "#{label} (#{summary})", else: summary
   end
 
   defp layers(config, values, curves, multi?, opts) do
@@ -182,8 +184,17 @@ defmodule EvalViz.Curves do
     :ok
   end
 
-  defp vl_opts(opts) do
+  # A lone curve has no legend to carry its AUC, so it goes in the subtitle
+  # instead of being computed and then never shown.
+  defp vl_opts(opts, curves, multi?) do
     base = [width: opts[:width], height: opts[:height]]
-    if opts[:title], do: [{:title, opts[:title]} | base], else: base
+    subtitle = if multi?, do: nil, else: hd(curves).legend
+
+    case {opts[:title], subtitle} do
+      {nil, nil} -> base
+      {title, nil} -> [{:title, title} | base]
+      {nil, subtitle} -> [{:title, [text: "", subtitle: subtitle]} | base]
+      {title, subtitle} -> [{:title, [text: title, subtitle: subtitle]} | base]
+    end
   end
 end

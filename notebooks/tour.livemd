@@ -1,0 +1,196 @@
+# EvalViz tour
+
+```elixir
+Mix.install(
+  [
+    {:evalviz, path: Path.expand("..", __DIR__)},
+    {:kino, "~> 0.14"}
+  ],
+  # EXLA is optional, but the clustering examples are noticeably faster with it
+  config: [nx: [default_backend: EXLA.Backend]]
+)
+```
+
+## Data
+
+Three well separated blobs, plus a binary target for the classification plots.
+
+```elixir
+key = Nx.Random.key(42)
+
+{a, key} = Nx.Random.normal(key, 0.0, 0.6, shape: {30, 2})
+{b, key} = Nx.Random.normal(key, 4.0, 0.6, shape: {30, 2})
+{c, key} = Nx.Random.normal(key, 8.0, 0.6, shape: {24, 2})
+
+x = Nx.concatenate([a, b, c])
+Nx.shape(x)
+```
+
+## Confusion matrix
+
+```elixir
+y_true = Nx.tensor([0, 0, 1, 1, 2, 2, 0, 1, 2, 2, 1, 0])
+y_pred = Nx.tensor([0, 1, 0, 2, 2, 2, 0, 1, 2, 1, 1, 0])
+
+EvalViz.confusion_matrix(y_true, y_pred, num_classes: 3)
+```
+
+Normalized by true class, with names. Each row now sums to one, so the diagonal
+reads as per-class recall.
+
+```elixir
+EvalViz.confusion_matrix(y_true, y_pred,
+  num_classes: 3,
+  class_names: ["cat", "dog", "bird"],
+  normalize: :true_class
+)
+```
+
+## ROC, precision-recall and DET
+
+```elixir
+{scores, key} = Nx.Random.uniform(key, shape: {300})
+{noise, key} = Nx.Random.uniform(key, shape: {300})
+
+labels = Nx.select(Nx.greater(scores, 0.5), 1, 0)
+weak = Nx.add(Nx.multiply(scores, 0.4), Nx.multiply(noise, 0.6))
+
+EvalViz.roc_curve(
+  [
+    {"Strong", labels, scores},
+    {"Weak", labels, weak}
+  ],
+  title: "ROC"
+)
+```
+
+```elixir
+EvalViz.precision_recall_curve(
+  [
+    {"Strong", labels, scores},
+    {"Weak", labels, weak}
+  ],
+  title: "Precision-Recall"
+)
+```
+
+```elixir
+EvalViz.det_curve(labels, weak, title: "DET")
+```
+
+## Calibration
+
+A model whose probabilities mean what they say tracks the diagonal.
+
+```elixir
+{u, key} = Nx.Random.uniform(key, shape: {600})
+{r, key} = Nx.Random.uniform(key, shape: {600})
+
+calibrated_y = Nx.select(Nx.less(r, u), 1, 0)
+overconfident = Nx.clip(Nx.add(Nx.multiply(Nx.subtract(u, 0.5), 1.8), 0.5), 0.001, 0.999)
+
+EvalViz.calibration_curve(
+  [
+    {"Calibrated", calibrated_y, u},
+    {"Overconfident", calibrated_y, overconfident}
+  ],
+  bins: 10,
+  title: "Calibration"
+)
+```
+
+## Dendrogram
+
+```elixir
+model = Scholar.Cluster.Hierarchical.fit(x, linkage: :ward)
+
+EvalViz.dendrogram(model, color_threshold: 8.0, title: "Ward linkage")
+```
+
+Try moving `color_threshold` and watch the clusters split and merge. That is
+the height you would cut the tree at.
+
+```elixir
+threshold = Kino.Input.range("Cut height", min: 0.5, max: 25, default: 8, step: 0.5)
+```
+
+```elixir
+EvalViz.dendrogram(model, color_threshold: Kino.Input.read(threshold))
+```
+
+## Silhouette
+
+```elixir
+kmeans = Scholar.Cluster.KMeans.fit(x, num_clusters: 3, key: Nx.Random.key(1))
+
+EvalViz.silhouette(x, kmeans.labels, num_clusters: 3, title: "k = 3")
+```
+
+Ask for more clusters than the data has and the diagram says so: the mean drops
+and bars start going negative, meaning those points sit closer to a neighbour.
+
+```elixir
+too_many = Scholar.Cluster.KMeans.fit(x, num_clusters: 6, key: Nx.Random.key(1))
+
+EvalViz.silhouette(x, too_many.labels, num_clusters: 6, title: "k = 6")
+```
+
+## PCA scree
+
+Six features built from only three real directions, so the elbow lands at three.
+
+```elixir
+{base, key} = Nx.Random.normal(key, shape: {200, 3})
+
+mixing =
+  Nx.tensor([
+    [1.0, 0.2, 0.0, 0.5, 0.1, 0.3],
+    [0.0, 1.0, 0.3, 0.1, 0.7, 0.2],
+    [0.2, 0.0, 1.0, 0.3, 0.2, 0.9]
+  ])
+
+{small_noise, key} = Nx.Random.normal(key, 0.0, 0.05, shape: {200, 6})
+wide = Nx.add(Nx.dot(base, mixing), small_noise)
+
+pca = Scholar.Decomposition.PCA.fit(wide, num_components: 6)
+EvalViz.scree(pca, title: "Explained variance")
+```
+
+## Regression
+
+```elixir
+{feature, key} = Nx.Random.uniform(key, 0.0, 10.0, shape: {150, 1})
+{err, _key} = Nx.Random.normal(key, 0.0, 1.2, shape: {150})
+
+target = Nx.add(Nx.add(Nx.multiply(Nx.squeeze(feature), 2.5), 4.0), err)
+
+fit = Scholar.Linear.LinearRegression.fit(feature, target)
+predicted = Scholar.Linear.LinearRegression.predict(fit, feature)
+
+EvalViz.predicted_vs_actual(target, predicted, title: "Predicted vs actual")
+```
+
+```elixir
+EvalViz.residuals(target, predicted, title: "Residuals")
+```
+
+Fit a straight line to curved data and the residuals arc, which is the plot
+earning its keep: the scatter above looks fine, this one does not.
+
+```elixir
+curved = Nx.add(Nx.pow(Nx.squeeze(feature), 2), err)
+bad_fit = Scholar.Linear.LinearRegression.fit(feature, curved)
+bad_pred = Scholar.Linear.LinearRegression.predict(bad_fit, feature)
+
+EvalViz.residuals(curved, bad_pred, title: "Linear fit on quadratic data")
+```
+
+## Composing
+
+Every function returns a `VegaLite` struct, so you can keep going with the
+`VegaLite` API.
+
+```elixir
+EvalViz.roc_curve(labels, scores, title: "Held-out set")
+|> VegaLite.config(axis: [grid: false], view: [stroke: nil])
+```

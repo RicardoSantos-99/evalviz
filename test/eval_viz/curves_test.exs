@@ -48,6 +48,28 @@ defmodule EvalViz.CurvesTest do
       refute curve_layer(EvalViz.roc_curve(y_true(), scores()))["encoding"]["color"]
     end
 
+    test "a single curve shows its AUC as a subtitle, since it has no legend" do
+      assert spec(EvalViz.roc_curve(y_true(), scores()))["title"] == %{
+               "text" => "",
+               "subtitle" => "AUC = 0.75"
+             }
+
+      assert spec(EvalViz.roc_curve(y_true(), scores(), title: "Held out"))["title"] == %{
+               "text" => "Held out",
+               "subtitle" => "AUC = 0.75"
+             }
+    end
+
+    test "comparing models keeps the plain title, the AUCs being in the legend" do
+      plot =
+        EvalViz.roc_curve(
+          [{"A", y_true(), scores()}, {"B", y_true(), Nx.tensor([0.2, 0.3, 0.6, 0.9])}],
+          title: "Comparison"
+        )
+
+      assert spec(plot)["title"] == "Comparison"
+    end
+
     test "comparing models colours by series" do
       plot =
         EvalViz.roc_curve([

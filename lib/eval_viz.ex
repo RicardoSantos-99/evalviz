@@ -5,8 +5,8 @@ defmodule EvalViz do
   Every function returns a `VegaLite` specification, which Livebook renders on
   its own and which you can keep customising through the `VegaLite` API:
 
-      EvalViz.confusion_matrix(y_true, y_pred, num_classes: 3)
-      |> VegaLite.title("Validation set")
+      EvalViz.confusion_matrix(y_true, y_pred, num_classes: 3, title: "Validation set")
+      |> VegaLite.config(axis: [grid: false])
 
   Nothing here assumes a particular modelling library. Pass the tensors your
   model produced and the plot follows, whether they came from Scholar, Axon or

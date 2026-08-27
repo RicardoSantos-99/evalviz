@@ -25,6 +25,17 @@ Early development. Not published to Hex yet.
 - [x] Calibration curve
 - [x] Residuals and predicted vs actual
 
+## Trying it
+
+The plots are Vega-Lite specs, so Livebook renders them with no extra step:
+
+```
+open -a Livebook notebooks/tour.livemd
+```
+
+The tour walks through every plot with generated data, including cases where a
+model is deliberately wrong so you can see what that looks like.
+
 ## Usage
 
 ```elixir
