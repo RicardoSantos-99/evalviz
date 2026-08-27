@@ -2,6 +2,7 @@ defmodule EvalViz.ConfusionMatrix do
   @moduledoc false
 
   alias EvalViz.Internal
+  alias EvalViz.Theme
   alias VegaLite, as: Vl
 
   @opts_schema NimbleOptions.new!(
@@ -58,7 +59,7 @@ defmodule EvalViz.ConfusionMatrix do
       |> Vl.encode_field(:color, "value",
         type: :quantitative,
         title: value_title,
-        scale: [scheme: "blues"],
+        scale: [scheme: Theme.heatmap_scheme()],
         legend: [format: format]
       ),
       Vl.new()

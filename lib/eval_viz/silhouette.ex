@@ -1,6 +1,7 @@
 defmodule EvalViz.Silhouette do
   @moduledoc false
 
+  alias EvalViz.Theme
   alias VegaLite, as: Vl
 
   @opts_schema NimbleOptions.new!(
@@ -110,7 +111,7 @@ defmodule EvalViz.Silhouette do
   defp average_layer(mean) do
     Vl.new()
     |> Vl.data_from_values([%{"mean" => mean}])
-    |> Vl.mark(:rule, stroke_dash: [4, 4], color: "#333", size: 1)
+    |> Vl.mark(:rule, Theme.reference_mark())
     |> Vl.encode_field(:x, "mean", type: :quantitative)
   end
 

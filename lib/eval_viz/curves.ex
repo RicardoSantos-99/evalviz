@@ -2,6 +2,7 @@ defmodule EvalViz.Curves do
   @moduledoc false
 
   alias EvalViz.Internal
+  alias EvalViz.Theme
   alias Scholar.Metrics.Classification, as: Metrics
   alias VegaLite, as: Vl
 
@@ -162,7 +163,7 @@ defmodule EvalViz.Curves do
   defp reference_line(points) do
     Vl.new()
     |> Vl.data_from_values(points)
-    |> Vl.mark(:line, stroke_dash: [4, 4], color: "#999", size: 1)
+    |> Vl.mark(:line, Theme.reference_mark())
     |> Vl.encode_field(:x, "x", type: :quantitative)
     |> Vl.encode_field(:y, "y", type: :quantitative)
   end

@@ -2,6 +2,7 @@ defmodule EvalViz.Calibration do
   @moduledoc false
 
   alias EvalViz.Internal
+  alias EvalViz.Theme
   alias VegaLite, as: Vl
 
   @opts_schema NimbleOptions.new!(
@@ -144,7 +145,7 @@ defmodule EvalViz.Calibration do
   defp perfect_layer do
     Vl.new()
     |> Vl.data_from_values([%{"x" => 0, "y" => 0}, %{"x" => 1, "y" => 1}])
-    |> Vl.mark(:line, stroke_dash: [4, 4], color: "#999", size: 1)
+    |> Vl.mark(:line, Theme.reference_mark())
     |> Vl.encode_field(:x, "x", type: :quantitative)
     |> Vl.encode_field(:y, "y", type: :quantitative)
   end

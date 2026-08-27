@@ -1,6 +1,7 @@
 defmodule EvalViz.Dendrogram do
   @moduledoc false
 
+  alias EvalViz.Theme
   alias VegaLite, as: Vl
 
   @opts_schema NimbleOptions.new!(
@@ -167,7 +168,7 @@ defmodule EvalViz.Dendrogram do
   defp above_cut, do: "Above cut"
 
   defp encode_color(plot, colors) when map_size(colors) == 0 do
-    Vl.encode(plot, :color, value: "#4c78a8")
+    Vl.encode(plot, :color, value: Theme.primary())
   end
 
   defp encode_color(plot, colors) do
@@ -176,7 +177,7 @@ defmodule EvalViz.Dendrogram do
     # The links above the cut are not a cluster, so they get a neutral grey
     # rather than the next colour in the palette.
     domain = names ++ [above_cut()]
-    range = Enum.take(palette(), length(names)) ++ ["#b0b0b0"]
+    range = Theme.categorical(length(names)) ++ [Theme.muted()]
 
     Vl.encode_field(plot, :color, "cluster",
       type: :nominal,
@@ -187,19 +188,6 @@ defmodule EvalViz.Dendrogram do
 
   defp cluster_number("Cluster " <> number), do: String.to_integer(number)
   defp cluster_number(_), do: 0
-
-  defp palette do
-    Stream.cycle([
-      "#4c78a8",
-      "#f58518",
-      "#54a24b",
-      "#e45756",
-      "#72b7b2",
-      "#b279a2",
-      "#ff9da6",
-      "#9d755d"
-    ])
-  end
 
   defp leaf_labels(nil, order), do: Enum.map(order, &Integer.to_string/1)
 

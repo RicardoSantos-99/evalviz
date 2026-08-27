@@ -1,6 +1,7 @@
 defmodule EvalViz.Scree do
   @moduledoc false
 
+  alias EvalViz.Theme
   alias VegaLite, as: Vl
 
   @opts_schema NimbleOptions.new!(
@@ -46,7 +47,7 @@ defmodule EvalViz.Scree do
   defp layers(opts) do
     bars =
       Vl.new()
-      |> Vl.mark(:bar, tooltip: true, color: "#4c78a8")
+      |> Vl.mark(:bar, tooltip: true, color: Theme.primary())
       |> Vl.encode_field(:x, "component",
         type: :ordinal,
         title: "Component",
@@ -67,7 +68,7 @@ defmodule EvalViz.Scree do
 
   defp cumulative_layer do
     Vl.new()
-    |> Vl.mark(:line, point: true, color: "#f58518", tooltip: true)
+    |> Vl.mark(:line, point: true, color: Theme.secondary(), tooltip: true)
     |> Vl.encode_field(:x, "component", type: :ordinal)
     |> Vl.encode_field(:y, "cumulative", type: :quantitative)
   end

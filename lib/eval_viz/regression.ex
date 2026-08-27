@@ -2,6 +2,7 @@ defmodule EvalViz.Regression do
   @moduledoc false
 
   alias EvalViz.Internal
+  alias EvalViz.Theme
   alias VegaLite, as: Vl
 
   @opts_schema NimbleOptions.new!(
@@ -85,7 +86,7 @@ defmodule EvalViz.Regression do
   defp diagonal([min, max]) do
     Vl.new()
     |> Vl.data_from_values([%{"x" => min, "y" => min}, %{"x" => max, "y" => max}])
-    |> Vl.mark(:line, stroke_dash: [4, 4], color: "#999", size: 1)
+    |> Vl.mark(:line, Theme.reference_mark())
     |> Vl.encode_field(:x, "x", type: :quantitative)
     |> Vl.encode_field(:y, "y", type: :quantitative)
   end
@@ -93,7 +94,7 @@ defmodule EvalViz.Regression do
   defp zero_line do
     Vl.new()
     |> Vl.data_from_values([%{"zero" => 0}])
-    |> Vl.mark(:rule, stroke_dash: [4, 4], color: "#999", size: 1)
+    |> Vl.mark(:rule, Theme.reference_mark())
     |> Vl.encode_field(:y, "zero", type: :quantitative)
   end
 
