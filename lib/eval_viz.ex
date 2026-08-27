@@ -21,11 +21,14 @@ defmodule EvalViz do
   anywhere else.
   """
 
+  alias EvalViz.Biplot
   alias EvalViz.Calibration
   alias EvalViz.ConfusionMatrix
   alias EvalViz.Curves
   alias EvalViz.Dendrogram
   alias EvalViz.LearningCurve
+  alias EvalViz.Loadings
+  alias EvalViz.Projection
   alias EvalViz.Regression
   alias EvalViz.Scree
   alias EvalViz.Threshold
@@ -252,6 +255,57 @@ defmodule EvalViz do
   end
 
   @doc """
+  Plots a two-dimensional embedding as a scatter, optionally coloured by label.
+
+  Takes the `{num_samples, num_components}` tensor any dimensionality reduction
+  produces, or a struct carrying it under `:embedding`. That covers
+  `Scholar.Manifold.TSNE`, `MDS` and `TriMap`, and the decompositions once they
+  have transformed the data.
+
+  Pass `labels` to colour the points, or a list of `{title, labels}` to draw the
+  same embedding several times side by side, which is how a clustering gets
+  compared against the truth.
+
+  Both axes share one range by default. The two directions of an embedding
+  measure the same thing, so letting them scale apart would stretch the shape of
+  the data, which is the whole reason for looking at it.
+
+  ## Options
+
+  #{NimbleOptions.docs(Projection.schema())}
+
+  ## Examples
+
+      iex> embedding = Nx.tensor([[0.0, 0.0], [1.0, 0.5], [5.0, 5.0], [5.5, 4.8]])
+      iex> labels = Nx.tensor([0, 0, 1, 1])
+      iex> plot = EvalViz.projection(embedding, labels, label_names: ["left", "right"])
+      iex> VegaLite.to_spec(plot)["data"]["values"] |> Enum.map(&(&1["label"]))
+      ["left", "left", "right", "right"]
+
+      iex> embedding = Nx.tensor([[0.0, 0.0], [1.0, 0.5], [5.0, 5.0], [5.5, 4.8]])
+      iex> plot =
+      ...>   EvalViz.projection(embedding, [
+      ...>     {"True class", Nx.tensor([0, 0, 1, 1])},
+      ...>     {"KMeans", Nx.tensor([1, 0, 1, 1])}
+      ...>   ])
+      iex> VegaLite.to_spec(plot)["hconcat"] |> length()
+      2
+  """
+  def projection(embedding, labels_or_opts \\ [], opts \\ [])
+
+  def projection(embedding, series, opts) when is_list(series) and is_list(opts) do
+    if Keyword.keyword?(series) and opts == [] do
+      Projection.plot(embedding, [], series)
+    else
+      Projection.plot(embedding, normalize_panels(series), opts)
+    end
+  end
+
+  def projection(embedding, labels, opts) do
+    Projection.plot(embedding, [{nil, labels}], opts)
+  end
+
+  @doc """
   Plots a scree chart of the variance each principal component explains, with
   the running total overlaid.
 
@@ -273,6 +327,71 @@ defmodule EvalViz do
 
   def scree(%{explained_variance_ratio: ratios}, opts), do: Scree.plot(ratios, opts)
   def scree(ratios, opts), do: Scree.plot(ratios, opts)
+
+  @doc """
+  Plots a biplot: the projected points, with an arrow per feature showing which
+  way it pushes them.
+
+  Accepts a decomposition model and the data it was fitted on, in which case the
+  model's own `transform/2` produces the points, or a `{projection, loadings}`
+  pair of tensors shaped `{num_samples, num_components}` and
+  `{num_components, num_features}`.
+
+  Loadings and scores have unrelated units, so the arrows are stretched to sit
+  against the point cloud. Their directions and their lengths relative to each
+  other carry the meaning; their absolute length does not.
+
+  ## Options
+
+  #{NimbleOptions.docs(Biplot.schema())}
+
+  ## Examples
+
+      iex> projection = Nx.tensor([[1.0, 0.2], [-1.0, -0.2], [0.5, -0.5], [-0.5, 0.5]])
+      iex> loadings = Nx.tensor([[0.8, 0.6], [-0.6, 0.8]])
+      iex> plot = EvalViz.biplot({projection, loadings}, feature_names: ["height", "weight"])
+      iex> VegaLite.to_spec(plot)["layer"] |> length()
+      3
+  """
+  def biplot(model_or_pair, x_or_opts \\ [], opts \\ [])
+
+  def biplot({projection, loadings}, opts, _) when is_list(opts) do
+    Biplot.plot(projection, loadings, opts)
+  end
+
+  def biplot(%{components: loadings} = model, x, opts) do
+    Biplot.plot(transform(model, x), loadings, opts)
+  end
+
+  @doc """
+  Plots the loadings of a decomposition as a heatmap: one row per component, one
+  column per feature.
+
+  The scree plot says how much variance each component carries. This says what
+  each one is made of, which is what turns an unnamed component back into
+  something you can talk about.
+
+  Accepts a model exposing `:components` or the `{num_components, num_features}`
+  tensor itself. The colour scale is centred on zero, since a loading's sign
+  says which way the feature pushes.
+
+  ## Options
+
+  #{NimbleOptions.docs(Loadings.schema())}
+
+  ## Examples
+
+      iex> components = Nx.tensor([[0.7, 0.7], [-0.7, 0.7]])
+      iex> plot = EvalViz.loadings(components, feature_names: ["height", "weight"])
+      iex> VegaLite.to_spec(plot)["data"]["values"]
+      ...> |> Enum.map(&(&1["component"]))
+      ...> |> Enum.uniq()
+      ["Component 0", "Component 1"]
+  """
+  def loadings(model_or_components, opts \\ [])
+
+  def loadings(%{components: components}, opts), do: Loadings.plot(components, opts)
+  def loadings(components, opts), do: Loadings.plot(components, opts)
 
   @doc """
   Plots a calibration curve: how often the positive class actually occurs,
@@ -429,5 +548,22 @@ defmodule EvalViz do
       {label, y_true, y_score} -> {to_string(label), y_true, y_score}
       other -> raise ArgumentError, "expected {label, y_true, y_score}, got: #{inspect(other)}"
     end)
+  end
+
+  defp normalize_panels(panels) do
+    Enum.map(panels, fn
+      {title, labels} -> {to_string(title), labels}
+      other -> raise ArgumentError, "expected {title, labels}, got: #{inspect(other)}"
+    end)
+  end
+
+  defp transform(%module{} = model, x) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :transform, 2) do
+      module.transform(model, x)
+    else
+      raise ArgumentError,
+            "#{inspect(module)} has no transform/2, so the projection cannot be derived " <>
+              "from the model. Pass a {projection, loadings} pair instead."
+    end
   end
 end

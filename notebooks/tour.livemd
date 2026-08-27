@@ -248,6 +248,96 @@ pca = Scholar.Decomposition.PCA.fit(wide, num_components: 6)
 EvalViz.scree(pca, title: "Explained variance")
 ```
 
+## Projection
+
+Three groups living in eight dimensions, which is more than anyone can look at.
+Reducing them to two is how they become visible at all.
+
+```elixir
+{ga, key} = Nx.Random.normal(key, 0.0, 1.0, shape: {70, 8})
+{gb, key} = Nx.Random.normal(key, 2.6, 1.0, shape: {70, 8})
+{gc, key} = Nx.Random.normal(key, 5.2, 1.0, shape: {70, 8})
+
+groups = Nx.concatenate([ga, gb, gc])
+
+truth =
+  Nx.concatenate([
+    Nx.broadcast(0, {70}),
+    Nx.broadcast(1, {70}),
+    Nx.broadcast(2, {70})
+  ])
+
+group_pca = Scholar.Decomposition.PCA.fit(groups, num_components: 3)
+projected = Scholar.Decomposition.PCA.transform(group_pca, groups)
+
+EvalViz.projection(projected, truth,
+  label_names: ["left", "middle", "right"],
+  title: "Eight dimensions, seen in two"
+)
+```
+
+Both axes share one range on purpose. They measure the same kind of thing, so
+letting them scale apart would stretch the cloud and invent structure.
+
+Pass a list of labellings to draw the same embedding twice, which is how a
+clustering gets checked against the truth.
+
+```elixir
+kmeans = Scholar.Cluster.KMeans.fit(groups, num_clusters: 3)
+
+EvalViz.projection(projected, [
+  {"True class", truth},
+  {"KMeans", kmeans.labels}
+])
+```
+
+Cluster ids are arbitrary, so the colours need not agree between the panels.
+What you are comparing is which points ended up together.
+
+The same function takes any reduction. t-SNE returns the embedding as a plain
+tensor, MDS returns a struct carrying it, and both go straight in.
+
+```elixir
+mds = Scholar.Manifold.MDS.fit(groups, key: key, num_components: 2)
+
+EvalViz.projection(mds, truth,
+  label_names: ["left", "middle", "right"],
+  title: "MDS"
+)
+```
+
+## Biplot and loadings
+
+The scree plot says how much each component carries. These two say what the
+components are made of.
+
+A biplot puts the features back on the picture: each arrow is one feature,
+pointing the way it pushes the points.
+
+```elixir
+EvalViz.biplot(group_pca, groups,
+  labels: truth,
+  feature_names: Enum.map(0..7, &"f#{&1}"),
+  title: "Biplot"
+)
+```
+
+Arrows and points have unrelated units, so the arrows are stretched to sit
+against the cloud. Their directions, and their lengths next to each other, are
+what carry meaning.
+
+The same numbers as a heatmap, when there are too many features for arrows:
+
+```elixir
+EvalViz.loadings(group_pca,
+  feature_names: Enum.map(0..7, &"f#{&1}"),
+  title: "What each component is made of"
+)
+```
+
+The colour scale is centred on zero, since a loading's sign says which way the
+feature pushes.
+
 ## Regression
 
 ```elixir

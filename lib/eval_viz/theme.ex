@@ -55,4 +55,10 @@ defmodule EvalViz.Theme do
   A `heatmap` colour scheme name.
   """
   def heatmap_scheme, do: "blues"
+
+  @doc """
+  Scheme for values that run either side of zero, such as PCA loadings, where a
+  sequential ramp would hide the sign.
+  """
+  def diverging_scheme, do: "blueorange"
 end

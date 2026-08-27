@@ -27,6 +27,8 @@ Early development. Not published to Hex yet.
 - [x] Threshold curve
 - [x] Learning curve
 - [x] Multiclass one-vs-rest, with micro and macro averages
+- [x] Projection scatter, side by side
+- [x] PCA biplot and loadings heatmap
 
 ## Trying it
 
@@ -126,6 +128,48 @@ EvalViz.silhouette(x, labels, num_clusters: 3)
 pca = Scholar.Decomposition.PCA.fit(x, num_components: 6)
 EvalViz.scree(pca)
 ```
+
+### Projection
+
+Any dimensionality reduction ends in a `{num_samples, num_components}` tensor,
+so one function covers all of them: PCA, kernel PCA, truncated SVD, t-SNE, MDS
+and TriMap. Structs carrying the result under `:embedding`, as MDS does, go in
+directly.
+
+```elixir
+embedding = Scholar.Manifold.TSNE.fit(x, key: key, num_components: 2)
+
+EvalViz.projection(embedding, y_true, label_names: ["cat", "dog", "bird"])
+```
+
+Both axes share one range by default. They measure the same kind of thing, so
+letting them scale apart would stretch the cloud and invent structure that is
+not there.
+
+Pass a list of labellings to draw the same embedding side by side, which is how
+a clustering gets checked against the truth:
+
+```elixir
+EvalViz.projection(embedding, [
+  {"True class", y_true},
+  {"KMeans", kmeans.labels}
+])
+```
+
+### Biplot and loadings
+
+The scree plot says how much variance each component carries. These say what
+each one is made of.
+
+```elixir
+EvalViz.biplot(pca, x, feature_names: ["height", "weight", "age"])
+EvalViz.loadings(pca, feature_names: ["height", "weight", "age"])
+```
+
+The biplot draws one arrow per feature over the projected points. Arrows and
+points have unrelated units, so the arrows are stretched to sit against the
+cloud: their directions and their lengths relative to each other carry the
+meaning, not their absolute size.
 
 ### Threshold
 
