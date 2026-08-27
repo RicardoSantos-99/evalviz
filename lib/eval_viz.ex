@@ -23,14 +23,20 @@ defmodule EvalViz do
 
   alias EvalViz.Biplot
   alias EvalViz.Calibration
+  alias EvalViz.Coefficients
   alias EvalViz.ConfusionMatrix
+  alias EvalViz.Correlation
   alias EvalViz.Curves
   alias EvalViz.Dendrogram
+  alias EvalViz.Distribution
+  alias EvalViz.Elbow
+  alias EvalViz.Internal
   alias EvalViz.LearningCurve
   alias EvalViz.Loadings
   alias EvalViz.Projection
   alias EvalViz.Regression
   alias EvalViz.Scree
+  alias EvalViz.ScoreDistribution
   alias EvalViz.Threshold
   alias EvalViz.Silhouette
 
@@ -255,6 +261,45 @@ defmodule EvalViz do
   end
 
   @doc """
+  Plots a score against the number of clusters, to find where adding another
+  stops paying.
+
+  Accepts a list of fitted models exposing `:inertia` and `:clusters`, or the
+  values of k and their scores directly, so it works with any score you can
+  compute per k.
+
+  The dashed rule marks the k furthest from the line joining the first and last
+  points, measured after rescaling both axes to `0..1`. Without that rescaling
+  the distance would only ever reflect whichever axis spans more.
+
+  ## Options
+
+  #{NimbleOptions.docs(Elbow.schema())}
+
+  ## Examples
+
+      iex> plot = EvalViz.elbow([2, 3, 4, 5], [100.0, 40.0, 35.0, 32.0])
+      iex> VegaLite.to_spec(plot)["title"]["subtitle"]
+      "elbow at k = 3"
+
+      iex> plot = EvalViz.elbow([2, 3, 4, 5], [100.0, 40.0, 35.0, 32.0], mark_elbow: false)
+      iex> VegaLite.to_spec(plot)["layer"] |> length()
+      1
+  """
+  def elbow(models_or_ks, scores_or_opts \\ [], opts \\ [])
+
+  def elbow([%{} | _] = models, opts, _) when is_list(opts) do
+    ks = Enum.map(models, &Nx.axis_size(&1.clusters, 0))
+    scores = Enum.map(models, &Nx.to_number(&1.inertia))
+
+    Elbow.plot(ks, scores, opts)
+  end
+
+  def elbow(ks, scores, opts) do
+    Elbow.plot(numbers(ks), numbers(scores), opts)
+  end
+
+  @doc """
   Plots a two-dimensional embedding as a scatter, optionally coloured by label.
 
   Takes the `{num_samples, num_components}` tensor any dimensionality reduction
@@ -394,6 +439,62 @@ defmodule EvalViz do
   def loadings(components, opts), do: Loadings.plot(components, opts)
 
   @doc """
+  Plots a model's coefficients as a bar per feature, ordered by magnitude.
+
+  Accepts a model exposing `:coefficients` or the tensor itself, shaped
+  `{num_features}` for a regression or `{num_features, num_classes}` for a
+  classifier, in which case each feature gets a bar per class.
+
+  Coefficients are only comparable across features when the features were
+  scaled to begin with. On raw features a large coefficient may say nothing
+  more than that the column is measured in small units.
+
+  ## Options
+
+  #{NimbleOptions.docs(Coefficients.schema())}
+
+  ## Examples
+
+      iex> plot = EvalViz.coefficients(Nx.tensor([0.2, -1.5, 0.9]))
+      iex> VegaLite.to_spec(plot)["layer"] |> hd() |> get_in(["encoding", "y", "sort"])
+      ["1", "2", "0"]
+
+      iex> plot =
+      ...>   EvalViz.coefficients(Nx.tensor([0.2, -1.5, 0.9]),
+      ...>     feature_names: ["age", "income", "height"],
+      ...>     top: 2
+      ...>   )
+      iex> VegaLite.to_spec(plot)["data"]["values"] |> Enum.map(&(&1["feature"]))
+      ["income", "height"]
+  """
+  def coefficients(model_or_tensor, opts \\ [])
+
+  def coefficients(%{coefficients: tensor}, opts), do: Coefficients.plot(tensor, opts)
+  def coefficients(tensor, opts), do: Coefficients.plot(tensor, opts)
+
+  @doc """
+  Plots the correlation between every pair of columns as a heatmap.
+
+  Takes the `{num_samples, num_features}` data itself and computes the
+  coefficients with `Scholar.Stats.correlation_matrix/1`.
+
+  The colour scale is pinned to `-1..1` rather than fitted to the data, so a
+  matrix of weak correlations does not colour like a matrix of strong ones.
+
+  ## Options
+
+  #{NimbleOptions.docs(Correlation.schema())}
+
+  ## Examples
+
+      iex> x = Nx.tensor([[1.0, 2.0], [2.0, 4.0], [3.0, 6.0], [4.0, 8.0]])
+      iex> plot = EvalViz.correlation(x, feature_names: ["a", "b"])
+      iex> VegaLite.to_spec(plot)["data"]["values"] |> Enum.map(&(&1["label"]))
+      ["1.0", "1.0", "1.0", "1.0"]
+  """
+  def correlation(x, opts \\ []), do: Correlation.plot(x, opts)
+
+  @doc """
   Plots a calibration curve: how often the positive class actually occurs,
   against the probability the model gave it.
 
@@ -477,6 +578,54 @@ defmodule EvalViz do
   end
 
   @doc """
+  Plots the distribution of the residuals as a histogram.
+
+  `residuals/3` shows the residuals against the prediction, which is where a
+  systematic pattern shows up. This shows their shape: whether they centre on
+  zero, and whether the tail on one side is longer than the other.
+
+  ## Options
+
+  #{NimbleOptions.docs(Distribution.histogram_schema())}
+
+  ## Examples
+
+      iex> y_true = Nx.tensor([1.0, 2.0, 3.0, 4.0])
+      iex> y_pred = Nx.tensor([1.5, 2.0, 2.0, 4.5])
+      iex> plot = EvalViz.residual_distribution(y_true, y_pred, bins: 2)
+      iex> VegaLite.to_spec(plot)["data"]["values"] |> Enum.map(&(&1["count"])) |> Enum.sum()
+      4
+  """
+  def residual_distribution(y_true, y_pred, opts \\ []) do
+    Internal.assert_paired!(y_true, y_pred, "y_true", "y_pred")
+    Distribution.histogram(Nx.subtract(y_pred, y_true), opts)
+  end
+
+  @doc """
+  Plots a normal quantile-quantile plot: the sorted values against the
+  quantiles a normal sample of the same size would be expected to land on.
+
+  Points on the line mean the sample is normal. A curve at one end means that
+  tail is heavier or lighter than a normal's, and an S means both are.
+
+  Pass residuals to check the assumption a linear model makes about them. The
+  points sit where `scipy.stats.probplot` puts them, and the dashed line is the
+  least-squares fit through them.
+
+  ## Options
+
+  #{NimbleOptions.docs(Distribution.qq_schema())}
+
+  ## Examples
+
+      iex> values = Nx.tensor([0.3, -1.2, 1.5, -0.4, 0.1], type: :f64)
+      iex> plot = EvalViz.qq_plot(values)
+      iex> VegaLite.to_spec(plot)["data"]["values"] |> Enum.map(&(&1["sample"]))
+      [-1.2, -0.4, 0.1, 0.3, 1.5]
+  """
+  def qq_plot(values, opts \\ []), do: Distribution.qq(values, opts)
+
+  @doc """
   Plots precision, recall and F1 against the decision threshold.
 
   Every other classification plot here answers how good the ranking is. This one
@@ -509,6 +658,41 @@ defmodule EvalViz do
   """
   def threshold_curve(y_true, y_score, opts \\ []) do
     Threshold.plot(y_true, y_score, opts)
+  end
+
+  @doc """
+  Plots the scores the model gave, as one histogram per true class.
+
+  The threshold curve says where to cut. This says why the cut works or does
+  not: two humps that barely touch mean the model separates the classes, and
+  two that sit on top of each other mean no threshold will save it.
+
+  Each class's bars sum to one by default, which is what keeps a rare class
+  visible next to a common one. Pass `normalize: :none` for raw counts.
+
+  `y_true` may name any number of classes; `y_score` is the single score being
+  cut on.
+
+  ## Options
+
+  #{NimbleOptions.docs(ScoreDistribution.schema())}
+
+  ## Examples
+
+      iex> y_true = Nx.tensor([0, 0, 1, 1])
+      iex> scores = Nx.tensor([0.1, 0.2, 0.8, 0.9])
+      iex> plot = EvalViz.score_distribution(y_true, scores, bins: 2)
+      iex> VegaLite.to_spec(plot)["data"]["values"] |> Enum.map(&(&1["class"]))
+      ["0", "1"]
+
+      iex> y_true = Nx.tensor([0, 0, 1, 1])
+      iex> scores = Nx.tensor([0.1, 0.2, 0.8, 0.9])
+      iex> plot = EvalViz.score_distribution(y_true, scores, bins: 2, threshold: 0.5)
+      iex> VegaLite.to_spec(plot)["layer"] |> length()
+      2
+  """
+  def score_distribution(y_true, y_score, opts \\ []) do
+    ScoreDistribution.plot(y_true, y_score, opts)
   end
 
   @doc """
@@ -556,6 +740,9 @@ defmodule EvalViz do
       other -> raise ArgumentError, "expected {title, labels}, got: #{inspect(other)}"
     end)
   end
+
+  defp numbers(%Nx.Tensor{} = tensor), do: Nx.to_flat_list(tensor)
+  defp numbers(list) when is_list(list), do: list
 
   defp transform(%module{} = model, x) do
     if Code.ensure_loaded?(module) and function_exported?(module, :transform, 2) do

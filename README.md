@@ -29,6 +29,10 @@ Early development. Not published to Hex yet.
 - [x] Multiclass one-vs-rest, with micro and macro averages
 - [x] Projection scatter, side by side
 - [x] PCA biplot and loadings heatmap
+- [x] Score distribution by true class
+- [x] Elbow plot
+- [x] Coefficients and correlation matrix
+- [x] Residual histogram and normal Q-Q
 
 ## Trying it
 
@@ -129,6 +133,18 @@ pca = Scholar.Decomposition.PCA.fit(x, num_components: 6)
 EvalViz.scree(pca)
 ```
 
+To choose k, hand `elbow/3` the models you fitted, or the values of k and any
+score you computed for them:
+
+```elixir
+EvalViz.elbow(Enum.map(2..8, &Scholar.Cluster.KMeans.fit(x, num_clusters: &1)))
+```
+
+The rule marks the k furthest from the line joining the first and last points,
+measured after rescaling both axes to `0..1`, since k spans single digits and
+inertia can span thousands. A straight run of scores has no corner, and nothing
+is marked rather than a k being invented.
+
 ### Projection
 
 Any dimensionality reduction ends in a `{num_samples, num_components}` tensor,
@@ -183,6 +199,16 @@ EvalViz.threshold_curve(y_true, scores)
 Precision, recall and F1 against the decision threshold, with the best F1
 marked.
 
+```elixir
+EvalViz.score_distribution(y_true, scores, threshold: 0.5)
+```
+
+One histogram per true class. The threshold curve says where to cut; this says
+why the cut works or does not. Two humps that barely touch mean the model
+separates the classes; two sitting on top of each other mean no threshold will
+save it. Each class sums to one by default, which keeps a rare class visible
+next to a common one.
+
 ### Learning curve
 
 ```elixir
@@ -208,7 +234,30 @@ the cases the model called 70% likely, roughly 70% turned out positive.
 ```elixir
 EvalViz.predicted_vs_actual(y_true, y_pred)
 EvalViz.residuals(y_true, y_pred)
+EvalViz.residual_distribution(y_true, y_pred)
+EvalViz.qq_plot(Nx.subtract(y_pred, y_true))
 ```
+
+`residuals/3` shows the residuals against the prediction, which is where a
+systematic pattern shows up. `residual_distribution/3` shows their shape, and
+`qq_plot/2` checks them against a normal: points on the line mean normal, a
+curve at one end means that tail is heavier, an S means both are.
+
+Point positions and the fitted line match `scipy.stats.probplot`.
+
+### Coefficients and correlation
+
+```elixir
+EvalViz.coefficients(model, feature_names: ["age", "income", "height"])
+EvalViz.correlation(x, feature_names: ["age", "income", "height"])
+```
+
+`coefficients/2` reads any model exposing `:coefficients`, ordered by magnitude,
+with a bar per class when the model fits one coefficient per class. They are
+only comparable across features when the features were scaled to begin with.
+
+`correlation/2` pins its colour scale to `-1..1` rather than fitting it, so a
+matrix of weak correlations does not colour like a matrix of strong ones.
 
 ## License
 

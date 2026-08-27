@@ -142,6 +142,31 @@ what follows: given that ranking, where do you cut?
 EvalViz.threshold_curve(labels, weak, title: "Where to cut")
 ```
 
+And here is why that cut works or does not: the scores the model gave, split by
+what the answer actually was.
+
+```elixir
+EvalViz.score_distribution(labels, weak,
+  class_names: ["negative", "positive"],
+  threshold: 0.5,
+  title: "The weak model"
+)
+```
+
+The humps overlap, and everything in the overlap is a mistake some threshold
+has to make. The strong model has the same data with almost no overlap:
+
+```elixir
+EvalViz.score_distribution(labels, scores,
+  class_names: ["negative", "positive"],
+  threshold: 0.5,
+  title: "The strong model"
+)
+```
+
+Each class sums to one rather than showing raw counts, so a rare class stays
+visible next to a common one. Pass `normalize: :none` for the counts.
+
 ## Learning curve
 
 Nothing is trained here: these are scores you would have measured yourself, one
@@ -226,6 +251,25 @@ too_many = Scholar.Cluster.KMeans.fit(x, num_clusters: 6, key: Nx.Random.key(1))
 
 EvalViz.silhouette(x, too_many.labels, num_clusters: 6, title: "k = 6")
 ```
+
+## Elbow
+
+The silhouette judges one k at a time. This judges them together: hand it the
+models and it plots how much each extra cluster bought.
+
+```elixir
+EvalViz.elbow(
+  Enum.map(2..8, &Scholar.Cluster.KMeans.fit(x, num_clusters: &1, key: Nx.Random.key(1))),
+  title: "Choosing k"
+)
+```
+
+The rule marks the k furthest from the line joining the first and last points,
+measured after rescaling both axes to `0..1`: k spans single digits while
+inertia spans thousands, so raw distance would only ever measure the inertia.
+
+A straight run of scores has no corner at all, and then nothing is marked
+rather than a k being invented.
 
 ## PCA scree
 
@@ -366,6 +410,55 @@ bad_pred = Scholar.Linear.LinearRegression.predict(bad_fit, feature)
 
 EvalViz.residuals(curved, bad_pred, title: "Linear fit on quadratic data")
 ```
+
+The scatter above shows where a pattern is left. These two show the shape of
+what is left: a histogram, and the residuals against the quantiles a normal
+sample would land on.
+
+```elixir
+EvalViz.residual_distribution(target, predicted, title: "Residual distribution")
+```
+
+```elixir
+EvalViz.qq_plot(Nx.subtract(predicted, target), title: "Normal Q-Q")
+```
+
+The noise here was drawn from a normal, so the points sit on the line. Run the
+same plot on the bad fit and they do not, because what is left over is the
+curve the model could not follow rather than noise.
+
+```elixir
+EvalViz.qq_plot(Nx.subtract(bad_pred, curved), title: "Q-Q of the bad fit")
+```
+
+## Coefficients and correlation
+
+What the model learned, and what the features were doing to begin with.
+
+```elixir
+wide_fit = Scholar.Linear.LinearRegression.fit(wide, Nx.dot(wide, Nx.tensor([3.0, -2.0, 0.5, 0.1, 0.0, 1.4])))
+
+EvalViz.coefficients(wide_fit,
+  feature_names: Enum.map(0..5, &"f#{&1}"),
+  title: "Coefficients"
+)
+```
+
+Ordered by magnitude, since what matters is how far a feature moves the
+prediction, not which way. They are only comparable across features when the
+features were scaled to begin with: on raw columns a large coefficient may say
+nothing more than that the column is measured in small units.
+
+```elixir
+EvalViz.correlation(wide,
+  feature_names: Enum.map(0..5, &"f#{&1}"),
+  title: "Correlation"
+)
+```
+
+The colour scale is pinned to `-1..1` rather than fitted, so a matrix of weak
+correlations does not colour like a matrix of strong ones. These six columns
+were built from three directions, and the heatmap says so.
 
 ## Composing
 

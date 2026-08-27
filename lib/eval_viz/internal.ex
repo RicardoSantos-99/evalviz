@@ -32,6 +32,108 @@ defmodule EvalViz.Internal do
   end
 
   @doc """
+  The span `count` equal bins need to cover `values`, as `{lower, width}`.
+
+  Callers share one span across several series so their bars line up.
+  """
+  def bin_span(values, count) do
+    {min, max} = Enum.min_max(values)
+    width = if max > min, do: (max - min) / count, else: 1.0
+
+    {min, width}
+  end
+
+  @doc """
+  Counts `values` into `count` bins over `span`, as `[{lower, upper, count}]`.
+  """
+  def bin_counts(values, {lower, width}, count) do
+    tally = values |> Enum.map(&bin_index(&1, lower, width, count)) |> Enum.frequencies()
+
+    Enum.map(0..(count - 1), fn index ->
+      {lower + index * width, lower + (index + 1) * width, Map.get(tally, index, 0)}
+    end)
+  end
+
+  # The largest value divides exactly, which would put it one bin past the end.
+  defp bin_index(value, lower, width, count) do
+    ((value - lower) / width) |> trunc() |> max(0) |> min(count - 1)
+  end
+
+  @a [
+    -3.969683028665376e+01,
+    2.209460984245205e+02,
+    -2.759285104469687e+02,
+    1.383577518672690e+02,
+    -3.066479806614716e+01,
+    2.506628277459239e+00
+  ]
+
+  @b [
+    -5.447609879822406e+01,
+    1.615858368580409e+02,
+    -1.556989798598866e+02,
+    6.680131188771972e+01,
+    -1.328068155288572e+01
+  ]
+
+  @c [
+    -7.784894002430293e-03,
+    -3.223964580411365e-01,
+    -2.400758277161838e+00,
+    -2.549732539343734e+00,
+    4.374664141464968e+00,
+    2.938163982698783e+00
+  ]
+
+  @d [
+    7.784695709041462e-03,
+    3.224671290700398e-01,
+    2.445134137142996e+00,
+    3.754408661907416e+00
+  ]
+
+  @low 0.02425
+
+  @doc """
+  The value a standard normal falls below with probability `p`.
+
+  Acklam's rational approximation, whose relative error stays under 1.15e-9.
+  Nx has no inverse normal CDF, and a Q-Q plot cannot be drawn without one.
+  """
+  def normal_quantile(p) when p <= 0 or p >= 1 do
+    raise ArgumentError, "expected a probability strictly between 0 and 1, got #{inspect(p)}"
+  end
+
+  def normal_quantile(p) when p < @low do
+    q = :math.sqrt(-2 * :math.log(p))
+    tail(q)
+  end
+
+  def normal_quantile(p) when p > 1 - @low do
+    q = :math.sqrt(-2 * :math.log(1 - p))
+    -tail(q)
+  end
+
+  def normal_quantile(p) do
+    [a1, a2, a3, a4, a5, a6] = @a
+    [b1, b2, b3, b4, b5] = @b
+
+    q = p - 0.5
+    r = q * q
+
+    (((((a1 * r + a2) * r + a3) * r + a4) * r + a5) * r + a6) * q /
+      (((((b1 * r + b2) * r + b3) * r + b4) * r + b5) * r + 1)
+  end
+
+  defp tail(q) do
+    [c1, c2, c3, c4, c5, c6] = @c
+    [d1, d2, d3, d4] = @d
+
+    (((((c1 * q + c2) * q + c3) * q + c4) * q + c5) * q + c6) /
+      ((((d1 * q + d2) * q + d3) * q + d4) * q + 1)
+  end
+
+  @doc """
   Rounds for display without pulling in a formatting dependency.
   """
   def round_to(value, digits) when is_float(value), do: Float.round(value, digits)
