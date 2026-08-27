@@ -77,6 +77,43 @@ EvalViz.precision_recall_curve(
 EvalViz.det_curve(labels, weak, title: "DET")
 ```
 
+## Threshold
+
+Every other classification plot says how good the ranking is. This one answers
+what follows: given that ranking, where do you cut?
+
+```elixir
+EvalViz.threshold_curve(labels, weak, title: "Where to cut")
+```
+
+## Learning curve
+
+Nothing is trained here: these are scores you would have measured yourself, one
+per fold, so the mean comes with a band one standard deviation wide.
+
+```elixir
+EvalViz.learning_curve(
+  [20, 50, 100, 200, 400, 800],
+  [
+    [1.00, 0.99, 1.00],
+    [0.98, 0.97, 0.98],
+    [0.95, 0.96, 0.94],
+    [0.93, 0.92, 0.93],
+    [0.91, 0.92, 0.91],
+    [0.90, 0.90, 0.91]
+  ],
+  [
+    [0.62, 0.58, 0.65],
+    [0.72, 0.70, 0.75],
+    [0.80, 0.78, 0.82],
+    [0.85, 0.84, 0.86],
+    [0.88, 0.87, 0.88],
+    [0.89, 0.89, 0.89]
+  ],
+  title: "Learning curve"
+)
+```
+
 ## Calibration
 
 A model whose probabilities mean what they say tracks the diagonal.

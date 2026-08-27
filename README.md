@@ -25,6 +25,7 @@ Early development. Not published to Hex yet.
 - [x] Calibration curve
 - [x] Residuals and predicted vs actual
 - [x] Threshold curve
+- [x] Learning curve
 
 ## Trying it
 
@@ -118,6 +119,17 @@ EvalViz.threshold_curve(y_true, scores)
 
 Precision, recall and F1 against the decision threshold, with the best F1
 marked.
+
+### Learning curve
+
+```elixir
+EvalViz.learning_curve(train_sizes, train_scores, validation_scores)
+```
+
+This one does not train anything: pass the scores you already measured, the
+same split scikit-learn draws between computing a learning curve and displaying
+one. Give it a score per fold and the mean is drawn with a band one standard
+deviation wide.
 
 ### Calibration
 

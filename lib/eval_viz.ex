@@ -25,6 +25,7 @@ defmodule EvalViz do
   alias EvalViz.ConfusionMatrix
   alias EvalViz.Curves
   alias EvalViz.Dendrogram
+  alias EvalViz.LearningCurve
   alias EvalViz.Regression
   alias EvalViz.Scree
   alias EvalViz.Threshold
@@ -362,6 +363,38 @@ defmodule EvalViz do
   """
   def threshold_curve(y_true, y_score, opts \\ []) do
     Threshold.plot(y_true, y_score, opts)
+  end
+
+  @doc """
+  Plots training and validation score against how much data the model was
+  trained on.
+
+  Curves that meet at a low score mean the model is too simple for the problem;
+  a gap that stays wide as data grows means it is overfitting.
+
+  This does not train anything. Pass the scores you already measured, the same
+  split `scikit-learn` draws between computing a learning curve and displaying
+  one, so it works whatever you trained with. Scores may be one number per
+  training size, or one per fold, in which case the mean is drawn with a band
+  one standard deviation wide.
+
+  ## Options
+
+  #{NimbleOptions.docs(LearningCurve.schema())}
+
+  ## Examples
+
+      iex> sizes = [10, 20, 40]
+      iex> train = [[0.99, 0.98], [0.95, 0.94], [0.92, 0.91]]
+      iex> validation = [[0.70, 0.68], [0.80, 0.79], [0.88, 0.87]]
+      iex> plot = EvalViz.learning_curve(sizes, train, validation)
+      iex> VegaLite.to_spec(plot)["data"]["values"]
+      ...> |> Enum.map(&(&1["series"]))
+      ...> |> Enum.uniq()
+      ["Training", "Validation"]
+  """
+  def learning_curve(train_sizes, train_scores, validation_scores, opts \\ []) do
+    LearningCurve.plot(train_sizes, train_scores, validation_scores, opts)
   end
 
   defp normalize_series(series) do
