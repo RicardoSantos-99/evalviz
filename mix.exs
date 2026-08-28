@@ -51,9 +51,19 @@ defmodule EvalViz.MixProject do
 
   defp docs do
     [
-      main: "EvalViz",
+      main: "readme",
       source_ref: "v#{@version}",
-      source_url: @source_url
+      source_url: @source_url,
+      extra_section: "Guides",
+      extras: ["README.md", "notebooks/tour.livemd"],
+      groups_for_docs: [
+        "Whole screens": &(&1[:group] == :screens),
+        Classification: &(&1[:group] == :classification),
+        Regression: &(&1[:group] == :regression),
+        "Clustering and decomposition": &(&1[:group] == :clustering),
+        "Model selection": &(&1[:group] == :model_selection),
+        "Features and coefficients": &(&1[:group] == :features)
+      ]
     ]
   end
 end

@@ -2,8 +2,8 @@ defmodule EvalViz do
   @moduledoc """
   Model evaluation plots for Nx tensors.
 
-  Every function returns a `VegaLite` specification, which Livebook renders on
-  its own and which you can keep customising through the `VegaLite` API:
+  Every function returns a `VegaLite` specification. Livebook renders one on
+  sight, and you can keep customising it through the `VegaLite` API:
 
       iex> y_true = Nx.tensor([0, 0, 1, 1])
       iex> y_pred = Nx.tensor([0, 1, 1, 1])
@@ -13,12 +13,27 @@ defmodule EvalViz do
       ...> |> get_in(["config", "axis", "grid"])
       false
 
-  Rendering them in Livebook needs `kino_vega_lite`: the `Kino.Render`
-  implementation for `VegaLite` lives there rather than in `kino`.
+  Nothing here assumes a modelling library. Pass the tensors your model
+  produced, whether they came from Scholar, Axon, or a hand-rolled `defn`.
 
-  Nothing here assumes a particular modelling library. Pass the tensors your
-  model produced and the plot follows, whether they came from Scholar, Axon or
-  anywhere else.
+  ## Where to start
+
+  `report/3` draws the plots that go together for one model in a single call.
+  `grid/2` lays out any set you build yourself. The rest are listed below,
+  grouped by what you are looking at.
+
+  ## Reading the options
+
+  Plots that draw several things at once take a list of `{label, ...}` tuples
+  instead of bare tensors, and colour them apart. The classification curves
+  also take a `{num_samples, num_classes}` score matrix, which gives one
+  one-vs-rest curve per class.
+
+  ## Rendering
+
+  Livebook needs `kino_vega_lite` in the dependency list. The `Kino.Render`
+  implementation for `VegaLite` ships there rather than in `kino`, and without
+  it Livebook prints the struct instead of drawing the chart.
   """
 
   alias EvalViz.Biplot
@@ -45,6 +60,7 @@ defmodule EvalViz do
   alias EvalViz.Silhouette
   alias EvalViz.ValidationCurve
 
+  @doc group: :classification
   @doc """
   Plots a confusion matrix as a heatmap with the value written in each cell.
 
@@ -80,6 +96,7 @@ defmodule EvalViz do
     ConfusionMatrix.plot(y_true, y_pred, opts)
   end
 
+  @doc group: :classification
   @doc """
   Plots a ROC curve, with the area under it shown in the legend.
 
@@ -146,6 +163,7 @@ defmodule EvalViz do
     Curves.plot(:roc, [{nil, y_true, y_score}], opts)
   end
 
+  @doc group: :classification
   @doc """
   Plots a precision-recall curve, with average precision shown in the legend.
 
@@ -178,6 +196,7 @@ defmodule EvalViz do
     Curves.plot(:precision_recall, [{nil, y_true, y_score}], opts)
   end
 
+  @doc group: :classification
   @doc """
   Plots a detection error tradeoff curve: false negative rate against false
   positive rate.
@@ -206,6 +225,7 @@ defmodule EvalViz do
     Curves.plot(:det, [{nil, y_true, y_score}], opts)
   end
 
+  @doc group: :clustering
   @doc """
   Plots a dendrogram of an agglomerative clustering.
 
@@ -251,6 +271,7 @@ defmodule EvalViz do
     Dendrogram.plot(clades, heights, opts)
   end
 
+  @doc group: :clustering
   @doc """
   Plots a silhouette diagram: one bar per point, grouped by cluster and sorted
   within it.
@@ -275,6 +296,7 @@ defmodule EvalViz do
     Silhouette.plot(x, labels, opts)
   end
 
+  @doc group: :clustering
   @doc """
   Plots a score against the number of clusters, to find where adding another
   stops paying.
@@ -314,6 +336,7 @@ defmodule EvalViz do
     Elbow.plot(numbers(ks), numbers(scores), opts)
   end
 
+  @doc group: :clustering
   @doc """
   Plots a two-dimensional embedding as a scatter, optionally coloured by label.
 
@@ -365,6 +388,7 @@ defmodule EvalViz do
     Projection.plot(embedding, [{nil, labels}], opts)
   end
 
+  @doc group: :clustering
   @doc """
   Plots a scree chart of the variance each principal component explains, with
   the running total overlaid.
@@ -388,6 +412,7 @@ defmodule EvalViz do
   def scree(%{explained_variance_ratio: ratios}, opts), do: Scree.plot(ratios, opts)
   def scree(ratios, opts), do: Scree.plot(ratios, opts)
 
+  @doc group: :clustering
   @doc """
   Plots a biplot: the projected points, with an arrow per feature showing which
   way it pushes them.
@@ -423,6 +448,7 @@ defmodule EvalViz do
     Biplot.plot(transform(model, x), loadings, opts)
   end
 
+  @doc group: :clustering
   @doc """
   Plots the loadings of a decomposition as a heatmap: one row per component, one
   column per feature.
@@ -453,6 +479,7 @@ defmodule EvalViz do
   def loadings(%{components: components}, opts), do: Loadings.plot(components, opts)
   def loadings(components, opts), do: Loadings.plot(components, opts)
 
+  @doc group: :features
   @doc """
   Plots a model's coefficients as a bar per feature, ordered by magnitude.
 
@@ -487,6 +514,7 @@ defmodule EvalViz do
   def coefficients(%{coefficients: tensor}, opts), do: Coefficients.plot(tensor, opts)
   def coefficients(tensor, opts), do: Coefficients.plot(tensor, opts)
 
+  @doc group: :features
   @doc """
   Plots the correlation between every pair of columns as a heatmap.
 
@@ -509,6 +537,7 @@ defmodule EvalViz do
   """
   def correlation(x, opts \\ []), do: Correlation.plot(x, opts)
 
+  @doc group: :classification
   @doc """
   Plots a calibration curve: how often the positive class actually occurs,
   against the probability the model gave it.
@@ -547,6 +576,7 @@ defmodule EvalViz do
     Calibration.plot([{nil, y_true, y_prob}], opts)
   end
 
+  @doc group: :regression
   @doc """
   Plots predicted against actual values, with the diagonal a perfect model
   would sit on.
@@ -591,6 +621,7 @@ defmodule EvalViz do
     Regression.predicted_vs_actual([{nil, y_true, y_pred}], opts)
   end
 
+  @doc group: :regression
   @doc """
   Plots residuals against predicted values.
 
@@ -622,6 +653,7 @@ defmodule EvalViz do
     Regression.residuals([{nil, y_true, y_pred}], opts)
   end
 
+  @doc group: :regression
   @doc """
   Plots the distribution of the residuals as a histogram.
 
@@ -646,6 +678,7 @@ defmodule EvalViz do
     Distribution.histogram(Nx.subtract(y_pred, y_true), opts)
   end
 
+  @doc group: :regression
   @doc """
   Plots a normal quantile-quantile plot: the sorted values against the
   quantiles a normal sample of the same size would be expected to land on.
@@ -670,6 +703,7 @@ defmodule EvalViz do
   """
   def qq_plot(values, opts \\ []), do: Distribution.qq(values, opts)
 
+  @doc group: :classification
   @doc """
   Plots precision, recall and F1 against the decision threshold.
 
@@ -713,6 +747,7 @@ defmodule EvalViz do
     Threshold.plot(y_true, y_score, opts)
   end
 
+  @doc group: :classification
   @doc """
   Plots the scores the model gave, as one histogram per true class.
 
@@ -748,6 +783,7 @@ defmodule EvalViz do
     ScoreDistribution.plot(y_true, y_score, opts)
   end
 
+  @doc group: :model_selection
   @doc """
   Plots training and validation score against how much data the model was
   trained on.
@@ -802,6 +838,7 @@ defmodule EvalViz do
     LearningCurve.plot(train_sizes, [{nil, train_scores, validation_scores}], opts)
   end
 
+  @doc group: :model_selection
   @doc """
   Plots training and validation score against one hyperparameter.
 
@@ -841,6 +878,7 @@ defmodule EvalViz do
     ValidationCurve.plot(param_values, train_scores, validation_scores, opts)
   end
 
+  @doc group: :model_selection
   @doc """
   Plots a grid search as a heatmap, one cell per pair of hyperparameter values.
 
@@ -871,6 +909,7 @@ defmodule EvalViz do
   """
   def grid_search(results, opts \\ []), do: GridSearch.plot(results, opts)
 
+  @doc group: :model_selection
   @doc """
   Plots the score each fold got, with the mean they scatter around.
 
@@ -901,6 +940,7 @@ defmodule EvalViz do
   """
   def fold_scores(scores, opts \\ []), do: FoldScores.plot(scores, opts)
 
+  @doc group: :screens
   @doc """
   Lays several plots out in a wrapping grid.
 
@@ -936,6 +976,7 @@ defmodule EvalViz do
   """
   def grid(views, opts \\ []), do: Grid.plot(views, opts)
 
+  @doc group: :screens
   @doc """
   Draws a screen of the plots that go together for one model.
 
