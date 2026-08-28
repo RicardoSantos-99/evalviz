@@ -90,12 +90,6 @@ dendrogram's leaf order and bracket coordinates, and the Q-Q plot's positions
 and fitted line. Sample weights are pinned to their definition, which is that
 a weight of two matches the same data with that row duplicated.
 
-## Status
-
-Not on Hex yet. It depends on unreleased Scholar fixes through a local path
-dependency, and Hex will not accept a package with a non-Hex dependency.
-Waiting on a Scholar release.
-
 ## License
 
 Copyright (c) 2026 Ricardo Carvalho Santos

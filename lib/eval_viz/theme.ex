@@ -66,10 +66,9 @@ defmodule EvalViz.Theme do
   @doc """
   Legend options for a dash-pattern channel.
 
-  Its swatch has to show the pattern rather than a colour, and the default
-  filled dot shows neither: every entry comes out an identical blob. Outlining
-  the swatch and leaving it hollow lets the dash through. A `symbol_type` of
-  `"stroke"` would read better still, but renders nothing at all here.
+  The swatch has to show the pattern rather than a colour, and the default
+  filled dot shows neither. Outlining it and leaving it hollow lets the dash
+  through.
   """
   def dash_legend do
     [symbol_stroke_color: @symbol, symbol_stroke_width: 2, symbol_fill_color: "transparent"]

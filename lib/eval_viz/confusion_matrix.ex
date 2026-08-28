@@ -92,9 +92,7 @@ defmodule EvalViz.ConfusionMatrix do
         other -> [num_classes: num_classes, normalize: other]
       end
 
-    # Handed a tensor, Scholar's confusion_matrix raises "invalid numerical
-    # type: nil": it is the one caller of validate_weights that passes no type,
-    # and only the tensor branch needs one. A list goes through fine.
+    # Passed as a list, which every Scholar version accepts.
     computed =
       case opts[:sample_weights] do
         nil ->

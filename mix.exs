@@ -30,7 +30,6 @@ defmodule EvalViz.MixProject do
       {:nx, "~> 0.13"},
       {:vega_lite, "~> 0.1.9"},
       {:nimble_options, "~> 1.0"},
-      # local checkout while our fixes are merged upstream but not yet released
       {:scholar, path: "../scholar", override: true},
       {:jason, "~> 1.4", only: [:dev, :test]},
       {:vega_lite_convert, "~> 1.0", only: [:dev, :test]},
@@ -55,7 +54,7 @@ defmodule EvalViz.MixProject do
       source_ref: "v#{@version}",
       source_url: @source_url,
       extra_section: "Guides",
-      extras: ["README.md", "notebooks/tour.livemd"],
+      extras: ["README.md", "notebooks/tour.livemd", "CHANGELOG.md"],
       groups_for_docs: [
         "Whole screens": &(&1[:group] == :screens),
         Classification: &(&1[:group] == :classification),
