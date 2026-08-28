@@ -13,7 +13,9 @@ else.
 
 ## Status
 
-Early development. Not published to Hex yet.
+Not published to Hex yet: it depends on unreleased fixes in Scholar via a
+local path dependency, and Hex will not accept a package with a non-Hex
+dependency. Waiting on a new Scholar release.
 
 - [x] Confusion matrix
 - [x] ROC curve

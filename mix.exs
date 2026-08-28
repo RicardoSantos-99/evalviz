@@ -1,7 +1,7 @@
 defmodule EvalViz.MixProject do
   use Mix.Project
 
-  @version "0.1.0-dev"
+  @version "0.1.0"
   @source_url "https://github.com/RicardoSantos-99/evalviz"
 
   def project do
@@ -12,6 +12,7 @@ defmodule EvalViz.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       description: description(),
+      package: package(),
       docs: docs(),
       source_url: @source_url,
       name: "EvalViz"
@@ -39,6 +40,13 @@ defmodule EvalViz.MixProject do
 
   defp description do
     "Model evaluation plots for Nx: confusion matrices, ROC, precision-recall and DET curves."
+  end
+
+  defp package do
+    [
+      licenses: ["Apache-2.0"],
+      links: %{"GitHub" => @source_url}
+    ]
   end
 
   defp docs do
