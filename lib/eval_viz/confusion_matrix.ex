@@ -15,6 +15,7 @@ defmodule EvalViz.ConfusionMatrix do
                    type: {:list, {:or, [:string, :atom, :integer]}},
                    doc: "Axis labels, one per class. Defaults to `0..num_classes - 1`."
                  ],
+                 sample_weights: Internal.weights_option(),
                  normalize: [
                    type: {:in, [:none, :true_class, :predicted, :all]},
                    default: :none,
@@ -38,7 +39,7 @@ defmodule EvalViz.ConfusionMatrix do
     num_classes = opts[:num_classes]
     labels = Internal.class_labels(opts[:class_names], num_classes)
 
-    matrix = compute(y_true, y_pred, num_classes, opts[:normalize])
+    matrix = compute(y_true, y_pred, num_classes, opts)
     values = to_values(matrix, labels, opts[:normalize])
 
     {value_title, format} = value_encoding(opts[:normalize])
@@ -81,17 +82,29 @@ defmodule EvalViz.ConfusionMatrix do
     matrix |> Nx.reduce_max() |> Nx.to_number() |> Kernel.*(0.65)
   end
 
-  defp compute(y_true, y_pred, num_classes, normalize) do
+  defp compute(y_true, y_pred, num_classes, opts) do
     # Scholar takes no :normalize key at all for raw counts, and names the
     # row-wise mode `true`, which reads as a boolean at the call site.
-    opts =
-      case normalize do
+    computed =
+      case opts[:normalize] do
         :none -> [num_classes: num_classes]
         :true_class -> [num_classes: num_classes, normalize: true]
         other -> [num_classes: num_classes, normalize: other]
       end
 
-    Scholar.Metrics.Classification.confusion_matrix(y_true, y_pred, opts)
+    # Handed a tensor, Scholar's confusion_matrix raises "invalid numerical
+    # type: nil": it is the one caller of validate_weights that passes no type,
+    # and only the tensor branch needs one. A list goes through fine.
+    computed =
+      case opts[:sample_weights] do
+        nil ->
+          computed
+
+        weights ->
+          [{:sample_weights, Internal.weight_list(weights, Nx.axis_size(y_true, 0))} | computed]
+      end
+
+    Scholar.Metrics.Classification.confusion_matrix(y_true, y_pred, computed)
   end
 
   defp to_values(matrix, labels, normalize) do

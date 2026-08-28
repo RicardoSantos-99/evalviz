@@ -32,6 +32,50 @@ defmodule EvalViz.Internal do
   end
 
   @doc """
+  The option spec for per-sample weights, shared by every plot that takes them.
+  """
+  def weights_option do
+    [
+      type: {:or, [{:list, {:or, [:float, :integer]}}, :any]},
+      doc: """
+      Per-sample weights, as a list or rank-1 tensor. A weight of two counts a
+      sample twice, exactly as duplicating the row would.
+      """
+    ]
+  end
+
+  @doc """
+  Weights as a tensor, or `1.0` when there are none, checked against `count`.
+  """
+  def weights(nil, _count), do: 1.0
+
+  def weights(weights, count) do
+    tensor = if is_list(weights), do: Nx.tensor(weights), else: weights
+
+    if Nx.rank(tensor) != 1 do
+      raise ArgumentError,
+            "expected :sample_weights to be rank 1, got rank #{Nx.rank(tensor)}"
+    end
+
+    if Nx.axis_size(tensor, 0) != count do
+      raise ArgumentError,
+            "expected one sample weight per sample, " <>
+              "got #{Nx.axis_size(tensor, 0)} for #{count} samples"
+    end
+
+    tensor
+  end
+
+  @doc """
+  Weights as a plain list of numbers, all ones when there are none.
+  """
+  def weight_list(nil, count), do: List.duplicate(1.0, count)
+
+  def weight_list(weights, count) do
+    weights |> weights(count) |> Nx.to_flat_list()
+  end
+
+  @doc """
   The span `count` equal bins need to cover `values`, as `{lower, width}`.
 
   Callers share one span across several series so their bars line up.
@@ -45,9 +89,19 @@ defmodule EvalViz.Internal do
 
   @doc """
   Counts `values` into `count` bins over `span`, as `[{lower, upper, count}]`.
+
+  With `weights`, a bin holds the sum of the weights that landed in it, so a
+  weight of two counts a sample twice.
   """
-  def bin_counts(values, {lower, width}, count) do
-    tally = values |> Enum.map(&bin_index(&1, lower, width, count)) |> Enum.frequencies()
+  def bin_counts(values, span, count), do: bin_counts(values, span, count, nil)
+
+  def bin_counts(values, {lower, width}, count, weights) do
+    tally =
+      values
+      |> Enum.zip(weights || List.duplicate(1, length(values)))
+      |> Enum.reduce(%{}, fn {value, weight}, acc ->
+        Map.update(acc, bin_index(value, lower, width, count), weight, &(&1 + weight))
+      end)
 
     Enum.map(0..(count - 1), fn index ->
       {lower + index * width, lower + (index + 1) * width, Map.get(tally, index, 0)}

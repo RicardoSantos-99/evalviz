@@ -95,6 +95,10 @@ defmodule EvalViz do
   gives each curve its own panel instead. The panel is titled with the curve's
   name and summary, so the colour legend goes away with it.
 
+  `:sample_weights` cannot be combined with `average: :micro`, which pools one
+  row per (sample, class) pair rather than one per sample, leaving the weights
+  describing something other than the rows they would apply to.
+
   ## Options
 
   #{NimbleOptions.docs(Curves.schema())}

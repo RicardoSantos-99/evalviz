@@ -9,10 +9,7 @@ defmodule EvalViz.Curves do
 
   @opts_schema NimbleOptions.new!(
                  title: [type: :string, doc: "Chart title."],
-                 sample_weights: [
-                   type: {:or, [{:list, {:or, [:float, :integer]}}, :any]},
-                   doc: "Per-sample weights, as a list or rank-1 tensor."
-                 ],
+                 sample_weights: Internal.weights_option(),
                  class_names: [
                    type: {:list, {:or, [:string, :atom, :integer]}},
                    doc: """
@@ -145,7 +142,7 @@ defmodule EvalViz.Curves do
     Internal.assert_paired!(y_true, y_score, "y_true", "y_score")
     assert_binary!(y_true)
 
-    weights = weights(opts[:sample_weights], Nx.axis_size(y_true, 0))
+    weights = Internal.weights(opts[:sample_weights], Nx.axis_size(y_true, 0))
     dvi = Metrics.distinct_value_indices(y_score)
 
     {x, y, _thresholds} = config.compute.(y_true, y_score, dvi, weights)
@@ -331,10 +328,6 @@ defmodule EvalViz.Curves do
     |> Vl.encode_field(:x, "x", type: :quantitative)
     |> Vl.encode_field(:y, "y", type: :quantitative)
   end
-
-  defp weights(nil, _n), do: 1.0
-  defp weights(list, _n) when is_list(list), do: Nx.tensor(list)
-  defp weights(tensor, _n), do: tensor
 
   defp assert_binary!(y_true) do
     distinct = y_true |> Nx.to_flat_list() |> Enum.uniq() |> Enum.sort()

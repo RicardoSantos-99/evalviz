@@ -23,6 +23,7 @@ defmodule EvalViz.Calibration do
                    would compare probabilities that were never comparable.
                    """
                  ],
+                 sample_weights: Internal.weights_option(),
                  bins: [
                    type: :pos_integer,
                    default: 10,
@@ -98,29 +99,31 @@ defmodule EvalViz.Calibration do
   defp curve({label, y_true, y_prob}, opts) do
     Internal.assert_paired!(y_true, y_prob, "y_true", "y_prob")
 
+    count = Nx.axis_size(y_true, 0)
     y_true = Nx.to_flat_list(y_true)
     y_prob = Nx.to_flat_list(y_prob)
+    weights = Internal.weight_list(opts[:sample_weights], count)
 
     assert_binary!(y_true)
     assert_probabilities!(y_prob)
 
     bin_edges = edges(y_prob, opts[:bins], opts[:strategy])
 
+    # Every mean here is weighted, so a weight of two counts a sample twice
+    # exactly as duplicating its row would.
     points =
-      y_prob
-      |> Enum.zip(y_true)
-      |> Enum.group_by(fn {prob, _} -> bin_of(prob, bin_edges) end)
+      [y_prob, y_true, weights]
+      |> Enum.zip()
+      |> Enum.group_by(fn {prob, _, _} -> bin_of(prob, bin_edges) end)
       |> Enum.sort_by(fn {bin, _} -> bin end)
-      |> Enum.map(fn {_bin, pairs} ->
-        count = length(pairs)
-        mean_prob = pairs |> Enum.map(&elem(&1, 0)) |> Enum.sum() |> Kernel./(count)
-        fraction = pairs |> Enum.map(&elem(&1, 1)) |> Enum.sum() |> Kernel./(count)
+      |> Enum.map(fn {_bin, triples} ->
+        total = triples |> Enum.map(&elem(&1, 2)) |> Enum.sum()
 
         %{
-          "predicted" => mean_prob,
-          "observed" => fraction / 1,
-          "count" => count,
-          "series" => legend(label, y_true, y_prob)
+          "predicted" => weighted_mean(triples, 0, total),
+          "observed" => weighted_mean(triples, 1, total),
+          "count" => total,
+          "series" => legend(label, y_true, y_prob, weights)
         }
       end)
 
@@ -154,15 +157,22 @@ defmodule EvalViz.Calibration do
     Enum.at(sorted, lower) * (1 - weight) + Enum.at(sorted, upper) * weight
   end
 
-  defp legend(nil, _y_true, _y_prob), do: nil
+  defp weighted_mean(triples, index, total) do
+    triples
+    |> Enum.map(fn triple -> elem(triple, index) * elem(triple, 2) end)
+    |> Enum.sum()
+    |> Kernel./(total)
+  end
 
-  defp legend(label, y_true, y_prob) do
+  defp legend(nil, _y_true, _y_prob, _weights), do: nil
+
+  defp legend(label, y_true, y_prob, weights) do
     brier =
-      y_prob
-      |> Enum.zip(y_true)
-      |> Enum.map(fn {prob, actual} -> (prob - actual) * (prob - actual) end)
+      [y_prob, y_true, weights]
+      |> Enum.zip()
+      |> Enum.map(fn {prob, actual, weight} -> (prob - actual) * (prob - actual) * weight end)
       |> Enum.sum()
-      |> Kernel./(length(y_true))
+      |> Kernel./(Enum.sum(weights))
       |> Float.round(4)
 
     "#{label} (Brier = #{brier})"

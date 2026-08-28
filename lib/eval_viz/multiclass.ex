@@ -34,6 +34,7 @@ defmodule EvalViz.Multiclass do
   """
   def micro({label, y_true, y_score}, opts) do
     if multiclass?(y_score) and :micro in averages(opts) do
+      assert_unweighted!(opts)
       num_classes = Nx.axis_size(y_score, 1)
       one_hot = Nx.equal(Nx.new_axis(y_true, 1), Nx.iota({1, num_classes}))
 
@@ -41,6 +42,19 @@ defmodule EvalViz.Multiclass do
     else
       []
     end
+  end
+
+  # The micro average pools every (sample, class) pair, so it holds one row per
+  # pair rather than per sample and the caller's weights no longer line up.
+  defp assert_unweighted!(opts) do
+    if opts[:sample_weights] do
+      raise ArgumentError,
+            "sample weights cannot be combined with the micro average, which " <>
+              "pools one row per (sample, class) pair rather than per sample. " <>
+              "Drop one of the two."
+    end
+
+    :ok
   end
 
   def compose(nil, name), do: name

@@ -27,6 +27,7 @@ defmodule EvalViz.Threshold do
                    (sample, class) pair into one binary problem.
                    """
                  ],
+                 sample_weights: Internal.weights_option(),
                  facet: [
                    type: :boolean,
                    default: false,
@@ -66,7 +67,7 @@ defmodule EvalViz.Threshold do
     sub_series = Multiclass.per_class(entry, opts) ++ Multiclass.micro(entry, opts)
     multi? = length(sub_series) > 1
 
-    rows = Enum.flat_map(sub_series, &curve(&1, opts[:metrics]))
+    rows = Enum.flat_map(sub_series, &curve(&1, opts))
     best = best_f1(rows, opts, multi?)
 
     if opts[:facet] and multi? do
@@ -98,12 +99,16 @@ defmodule EvalViz.Threshold do
   # precision_recall_curve returns one more precision/recall than it does
   # thresholds: the final pair is the degenerate point where nothing is
   # predicted positive, which has no threshold to sit at.
-  defp curve({class, y_true, y_score}, metrics) do
+  defp curve({class, y_true, y_score}, opts) do
     Internal.assert_paired!(y_true, y_score, "y_true", "y_score")
     assert_binary!(y_true)
 
+    metrics = opts[:metrics]
+    weights = Internal.weights(opts[:sample_weights], Nx.axis_size(y_true, 0))
     dvi = Metrics.distinct_value_indices(y_score)
-    {precision, recall, thresholds} = Metrics.precision_recall_curve(y_true, y_score, dvi)
+
+    {precision, recall, thresholds} =
+      Metrics.precision_recall_curve(y_true, y_score, dvi, weights)
 
     thresholds = Nx.to_flat_list(thresholds)
     precision = precision |> Nx.to_flat_list() |> Enum.take(length(thresholds))

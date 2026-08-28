@@ -37,6 +37,7 @@ Early development. Not published to Hex yet.
 - [x] One-call report, and a grid to compose any plots
 - [x] Model comparison across curves, calibration, regression and learning curves
 - [x] Faceting, a panel per class when the overlay gets crowded
+- [x] Sample weights across the counting plots
 
 ## Trying it
 
@@ -148,6 +149,23 @@ Faceting pays for itself twice over on the other two. Precision-recall draws
 each class's own baseline, which the overlay has to leave out because the
 classes disagree on it. The threshold curve gets colour back for the metric, so
 the dash pattern it was pushed onto is no longer needed.
+
+### Sample weights
+
+Every classification plot that counts something takes `:sample_weights`: the
+confusion matrix, the three curves, the threshold curve, calibration and the
+score distribution.
+
+```elixir
+EvalViz.confusion_matrix(y_true, y_pred, num_classes: 2, sample_weights: weights)
+```
+
+A weight of two counts a sample twice, exactly as holding that row twice would,
+and the tests pin it to that: every weighted plot is checked against the same
+data with the row duplicated.
+
+The one combination left out is weights alongside `average: :micro`, which
+pools one row per (sample, class) pair rather than one per sample.
 
 ### Dendrogram
 

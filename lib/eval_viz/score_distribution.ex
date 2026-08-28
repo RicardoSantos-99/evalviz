@@ -11,6 +11,7 @@ defmodule EvalViz.ScoreDistribution do
                    default: 30,
                    doc: "Number of bins, shared by every class so the bars line up."
                  ],
+                 sample_weights: Internal.weights_option(),
                  normalize: [
                    type: {:in, [:class, :none]},
                    default: :class,
@@ -42,12 +43,12 @@ defmodule EvalViz.ScoreDistribution do
 
     scores = Nx.to_flat_list(y_score)
     span = Internal.bin_span(scores, opts[:bins])
+    weights = Internal.weight_list(opts[:sample_weights], Nx.axis_size(y_true, 0))
 
     grouped =
-      y_true
-      |> Nx.to_flat_list()
-      |> Enum.zip(scores)
-      |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+      [Nx.to_flat_list(y_true), scores, weights]
+      |> Enum.zip()
+      |> Enum.group_by(&elem(&1, 0), fn {_label, score, weight} -> {score, weight} end)
       |> Enum.sort_by(&elem(&1, 0))
 
     names = class_names(grouped, opts[:class_names])
@@ -58,9 +59,13 @@ defmodule EvalViz.ScoreDistribution do
     |> Vl.layers(layers(names, values, opts))
   end
 
-  defp bars({label, scores}, span, names, opts) do
-    counts = Internal.bin_counts(scores, span, opts[:bins])
-    divisor = if opts[:normalize] == :class, do: length(scores), else: 1
+  defp bars({label, weighted}, span, names, opts) do
+    {scores, weights} = Enum.unzip(weighted)
+    counts = Internal.bin_counts(scores, span, opts[:bins], weights)
+
+    # The class total is the weight it carries, not how many rows it has, so a
+    # weighted class still sums to one.
+    divisor = if opts[:normalize] == :class, do: Enum.sum(weights), else: 1
     name = Map.fetch!(names, label)
 
     counts
