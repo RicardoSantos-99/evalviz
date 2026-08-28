@@ -3,9 +3,6 @@
 ```elixir
 Mix.install([
   {:verdict, path: Path.expand("..", __DIR__)},
-  # kino on its own does not know how to draw a Vega-Lite spec: the
-  # Kino.Render implementation for it ships in kino_vega_lite, and without
-  # that Livebook prints the struct instead of the chart
   {:kino_vega_lite, "~> 0.1"}
 ])
 ```
