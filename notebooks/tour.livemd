@@ -3,11 +3,17 @@
 ```elixir
 Mix.install([
   {:verdict, path: Path.expand("..", __DIR__)},
-  {:kino_vega_lite, "~> 0.1"}
+  {:kino_vega_lite, "~> 0.1.13"},
+  {:exla, "~> 0.9"}
 ])
 ```
 
 ## Data
+
+```elixir
+Nx.global_default_backend(EXLA.Backend)
+Nx.Defn.global_default_options(compiler: EXLA)
+```
 
 Three well separated blobs, plus a binary target for the classification plots.
 
@@ -615,7 +621,11 @@ Verdict.qq_plot(Nx.subtract(bad_pred, curved), title: "Q-Q of the bad fit")
 What the model learned, and what the features were doing to begin with.
 
 ```elixir
-wide_fit = Scholar.Linear.LinearRegression.fit(wide, Nx.dot(wide, Nx.tensor([3.0, -2.0, 0.5, 0.1, 0.0, 1.4])))
+wide_fit =
+  Scholar.Linear.LinearRegression.fit(
+    wide,
+    Nx.dot(wide, Nx.tensor([3.0, -2.0, 0.5, 0.1, 0.0, 1.4]))
+  )
 
 Verdict.coefficients(wide_fit,
   feature_names: Enum.map(0..5, &"f#{&1}"),
