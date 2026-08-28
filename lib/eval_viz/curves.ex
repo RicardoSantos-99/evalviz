@@ -30,6 +30,20 @@ defmodule EvalViz.Curves do
                    averages them. Accepts either or both.
                    """
                  ],
+                 facet: [
+                   type: :boolean,
+                   default: false,
+                   doc: """
+                   Draws a panel per curve instead of overlaying them.
+                   One-vs-rest curves pile up fast, and past a handful of
+                   classes the overlay stops being readable.
+                   """
+                 ],
+                 columns: [
+                   type: :pos_integer,
+                   default: 3,
+                   doc: "Panels per row when faceting."
+                 ],
                  chance_line: [
                    type: :boolean,
                    default: true,
@@ -94,10 +108,31 @@ defmodule EvalViz.Curves do
 
     values = Enum.flat_map(curves, & &1.points)
 
-    Vl.new(vl_opts(opts, curves, multi?))
-    |> Vl.data_from_values(values)
-    |> Vl.layers(layers(config, values, curves, multi?, opts))
+    if opts[:facet] and multi? do
+      facet(config, values, curves, opts)
+    else
+      Vl.new(vl_opts(opts, curves, multi?))
+      |> Vl.data_from_values(values)
+      |> Vl.layers(layers(config, values, curves, multi?, false, opts))
+    end
   end
+
+  # Each panel already carries its curve's name, summary included, so the
+  # colour legend has nothing left to say and the channel goes unused.
+  defp facet(config, values, curves, opts) do
+    child =
+      Vl.new(width: opts[:width], height: opts[:height])
+      |> Vl.layers(layers(config, values, curves, false, true, opts))
+
+    # `columns` belongs to the outer spec, not to the facet definition, and the
+    # header would otherwise print the field's own name above the panels.
+    Vl.new([columns: opts[:columns]] ++ title(opts[:title]))
+    |> Vl.data_from_values(values)
+    |> Vl.facet([field: "series", type: :nominal, title: nil], child)
+  end
+
+  defp title(nil), do: []
+  defp title(text), do: [title: text]
 
   defp curves_for(entry, config, opts) do
     per_class = entry |> Multiclass.per_class(opts) |> Enum.map(&curve_points(&1, config, opts))
@@ -123,6 +158,7 @@ defmodule EvalViz.Curves do
       x
       |> Internal.points(y, x_field, y_field)
       |> Enum.map(&Map.put(&1, "series", legend))
+      |> with_baseline(config, y_true)
 
     %{points: points, legend: legend, y_true: y_true, summary: summary}
   end
@@ -151,13 +187,15 @@ defmodule EvalViz.Curves do
     legend = macro_legend(label, config, per_class)
 
     points =
-      Enum.map(grid, fn x ->
+      grid
+      |> Enum.map(fn x ->
         %{
           x_field => x,
           y_field => mean(Enum.map(curves, &interpolate(&1, x))),
           "series" => legend
         }
       end)
+      |> with_macro_baseline(per_class)
 
     %{points: points, legend: legend, y_true: nil, summary: nil}
   end
@@ -195,7 +233,31 @@ defmodule EvalViz.Curves do
 
   defp mean(values), do: Enum.sum(values) / length(values)
 
-  defp layers(config, values, curves, multi?, opts) do
+  # This curve averages the per-class ones, so its baseline is the average of
+  # theirs. Rows also have to agree on their columns, since a ragged set is
+  # rejected outright rather than read as a missing value.
+  defp with_macro_baseline(points, per_class) do
+    rates =
+      per_class
+      |> Enum.map(&(&1.points |> List.first(%{}) |> Map.get("baseline")))
+      |> Enum.reject(&is_nil/1)
+
+    case rates do
+      [] -> points
+      rates -> Enum.map(points, &Map.put(&1, "baseline", mean(rates)))
+    end
+  end
+
+  # A curve's own share of positives, carried on its rows so a faceted panel can
+  # draw the baseline that belongs to it.
+  defp with_baseline(points, %{chance: :positive_rate}, y_true) do
+    rate = y_true |> Nx.mean() |> Nx.to_number()
+    Enum.map(points, &Map.put(&1, "baseline", rate))
+  end
+
+  defp with_baseline(points, _config, _y_true), do: points
+
+  defp layers(config, values, curves, multi?, faceted?, opts) do
     {x_field, x_title} = config.x
     {y_field, y_title} = config.y
 
@@ -210,7 +272,7 @@ defmodule EvalViz.Curves do
       |> Vl.encode_field(:y, y_field, [type: :quantitative, title: y_title] ++ scale(config))
       |> encode_series(multi?)
 
-    case chance_layer(config.chance, curves, opts) do
+    case chance_layer(config.chance, curves, faceted?, opts) do
       nil -> [curve]
       reference -> [reference, curve]
     end
@@ -227,21 +289,29 @@ defmodule EvalViz.Curves do
   defp scale(%{domain: nil}), do: []
   defp scale(%{domain: [min, max]}), do: [scale: [domain: [min, max], nice: false]]
 
-  defp chance_layer(:none, _curves, _opts), do: nil
+  defp chance_layer(:none, _curves, _faceted?, _opts), do: nil
 
-  defp chance_layer(kind, curves, opts) do
-    if opts[:chance_line], do: build_chance_layer(kind, curves), else: nil
+  defp chance_layer(kind, curves, faceted?, opts) do
+    if opts[:chance_line], do: build_chance_layer(kind, curves, faceted?), else: nil
   end
 
-  defp build_chance_layer(:diagonal, _curves) do
+  defp build_chance_layer(:diagonal, _curves, _faceted?) do
     reference_line([%{"x" => 0, "y" => 0}, %{"x" => 1, "y" => 1}])
+  end
+
+  # A panel holds one class, so it can draw that class's own share rather than
+  # going without because the classes disagree.
+  defp build_chance_layer(:positive_rate, _curves, true) do
+    Vl.new()
+    |> Vl.mark(:rule, Theme.reference_mark())
+    |> Vl.encode_field(:y, "baseline", type: :quantitative)
   end
 
   # For precision-recall, a no-skill classifier sits at the share of positives,
   # so the baseline is a horizontal line rather than the diagonal. One-vs-rest
   # classes each have their own share, and a single line would misread as
   # theirs, so it is only drawn when every curve agrees on it.
-  defp build_chance_layer(:positive_rate, curves) do
+  defp build_chance_layer(:positive_rate, curves, false) do
     rates =
       curves
       |> Enum.filter(& &1.y_true)

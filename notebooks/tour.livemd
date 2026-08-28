@@ -123,6 +123,46 @@ EvalViz.roc_curve(my, probabilities,
 )
 ```
 
+Six classes overlaid would be six curves you have to trace back to a legend.
+`facet: true` gives each its own panel instead, titled with its name and AUC:
+
+```elixir
+EvalViz.roc_curve(my, probabilities,
+  class_names: ["left", "middle", "right"],
+  facet: true,
+  width: 200,
+  height: 180,
+  title: "One panel per class"
+)
+```
+
+Faceting pays for itself twice over on the other two. Overlaid, the
+precision-recall baseline has to be left out because the classes disagree on
+their share of positives. A panel holds one class, so each draws its own:
+
+```elixir
+EvalViz.precision_recall_curve(my, probabilities,
+  class_names: ["left", "middle", "right"],
+  facet: true,
+  width: 200,
+  height: 180,
+  title: "Each with its own baseline"
+)
+```
+
+And the threshold curve gets colour back for the metric, so the dash pattern it
+was pushed onto is not needed at all:
+
+```elixir
+EvalViz.threshold_curve(my, probabilities,
+  class_names: ["left", "middle", "right"],
+  facet: true,
+  width: 210,
+  height: 190,
+  title: "Three metrics, one class each"
+)
+```
+
 Calibration takes the same matrix, one curve per class:
 
 ```elixir

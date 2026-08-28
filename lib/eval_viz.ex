@@ -91,6 +91,10 @@ defmodule EvalViz do
   `{num_samples, num_classes}` matrix. That draws one one-vs-rest curve per
   class, and `:average` adds the micro or macro curve over them.
 
+  Past a handful of classes the overlay stops being readable, and `facet: true`
+  gives each curve its own panel instead. The panel is titled with the curve's
+  name and summary, so the colour legend goes away with it.
+
   ## Options
 
   #{NimbleOptions.docs(Curves.schema())}
@@ -144,7 +148,9 @@ defmodule EvalViz do
   Takes the same arguments as `roc_curve/3`, multiclass included. The dashed
   baseline sits at the share of positives in `y_true`, which is what a no-skill
   classifier scores. One-vs-rest classes each have their own share, so the
-  baseline is only drawn when every curve on the plot agrees on it.
+  baseline is only drawn when every curve on the plot agrees on it. Under
+  `facet: true` a panel holds one class, so each draws the baseline that
+  belongs to it rather than going without.
 
   ## Options
 
@@ -670,6 +676,9 @@ defmodule EvalViz do
   A `{num_samples, num_classes}` `y_score` gives one one-vs-rest set of curves
   per class, with colour carrying the class and the dash pattern the metric. The
   best-F1 rule is left out there, since each class peaks somewhere different.
+
+  `facet: true` gives each class its own panel, which also hands colour back to
+  the metric so the dash pattern is no longer needed to tell the two apart.
 
   Unlike the other plots here this one takes no list of models. Colour and dash
   are already spent on class and metric, and a third model dimension has no

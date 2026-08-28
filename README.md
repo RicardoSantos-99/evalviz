@@ -36,6 +36,7 @@ Early development. Not published to Hex yet.
 - [x] Validation curve, grid search heatmap, per-fold scores
 - [x] One-call report, and a grid to compose any plots
 - [x] Model comparison across curves, calibration, regression and learning curves
+- [x] Faceting, a panel per class when the overlay gets crowded
 
 ## Trying it
 
@@ -134,6 +135,19 @@ EvalViz.roc_curve(y_true, probabilities,
 sample weighs the same. `:macro` averages the per-class curves, so every class
 does, however few samples it has. Both match `scikit-learn`, curve values
 included.
+
+Past a handful of classes the overlay stops being readable. `facet: true` gives
+each curve its own panel, titled with its name and summary, so the legend is no
+longer needed:
+
+```elixir
+EvalViz.roc_curve(y_true, probabilities, facet: true, columns: 3)
+```
+
+Faceting pays for itself twice over on the other two. Precision-recall draws
+each class's own baseline, which the overlay has to leave out because the
+classes disagree on it. The threshold curve gets colour back for the metric, so
+the dash pattern it was pushed onto is no longer needed.
 
 ### Dendrogram
 

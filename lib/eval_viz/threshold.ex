@@ -27,6 +27,20 @@ defmodule EvalViz.Threshold do
                    (sample, class) pair into one binary problem.
                    """
                  ],
+                 facet: [
+                   type: :boolean,
+                   default: false,
+                   doc: """
+                   Draws a panel per class instead of overlaying them. That also
+                   frees colour to go back to the metric, so the dash pattern is
+                   no longer needed to tell the two apart.
+                   """
+                 ],
+                 columns: [
+                   type: :pos_integer,
+                   default: 3,
+                   doc: "Panels per row when faceting."
+                 ],
                  mark_best_f1: [
                    type: :boolean,
                    default: true,
@@ -55,10 +69,31 @@ defmodule EvalViz.Threshold do
     rows = Enum.flat_map(sub_series, &curve(&1, opts[:metrics]))
     best = best_f1(rows, opts, multi?)
 
-    Vl.new(vl_opts(opts, best))
-    |> Vl.data_from_values(rows)
-    |> Vl.layers(layers(rows, best, multi?, opts))
+    if opts[:facet] and multi? do
+      facet(rows, opts)
+    else
+      Vl.new(vl_opts(opts, best))
+      |> Vl.data_from_values(rows)
+      |> Vl.layers(layers(rows, best, multi?, opts))
+    end
   end
+
+  # A panel per class leaves only the metrics inside it, so colour goes back to
+  # carrying the metric and the dash pattern is not needed at all.
+  defp facet(rows, opts) do
+    child =
+      Vl.new(width: opts[:width], height: opts[:height])
+      |> Vl.layers(layers(rows, nil, false, opts))
+
+    # `columns` belongs to the outer spec, not to the facet definition, and the
+    # header would otherwise print the field's own name above the panels.
+    Vl.new([columns: opts[:columns]] ++ title(opts[:title]))
+    |> Vl.data_from_values(rows)
+    |> Vl.facet([field: "class", type: :nominal, title: nil], child)
+  end
+
+  defp title(nil), do: []
+  defp title(text), do: [title: text]
 
   # precision_recall_curve returns one more precision/recall than it does
   # thresholds: the final pair is the degenerate point where nothing is

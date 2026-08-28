@@ -37,6 +37,16 @@ defmodule EvalViz.Calibration do
                    which keeps the curve steady when predictions cluster.
                    """
                  ],
+                 facet: [
+                   type: :boolean,
+                   default: false,
+                   doc: "Draws a panel per curve instead of overlaying them."
+                 ],
+                 columns: [
+                   type: :pos_integer,
+                   default: 3,
+                   doc: "Panels per row when faceting."
+                 ],
                  perfect_line: [
                    type: :boolean,
                    default: true,
@@ -56,10 +66,30 @@ defmodule EvalViz.Calibration do
     multi? = length(curves) > 1
     values = Enum.flat_map(curves, & &1.points)
 
-    Vl.new(vl_opts(opts))
-    |> Vl.data_from_values(values)
-    |> Vl.layers(layers(multi?, opts))
+    if opts[:facet] and multi? do
+      facet(values, opts)
+    else
+      Vl.new(vl_opts(opts))
+      |> Vl.data_from_values(values)
+      |> Vl.layers(layers(multi?, opts))
+    end
   end
+
+  # Each panel names its own curve, so the colour legend has nothing to add.
+  defp facet(values, opts) do
+    child =
+      Vl.new(width: opts[:width], height: opts[:height])
+      |> Vl.layers(layers(false, opts))
+
+    # `columns` belongs to the outer spec, not to the facet definition, and the
+    # header would otherwise print the field's own name above the panels.
+    Vl.new([columns: opts[:columns]] ++ title(opts[:title]))
+    |> Vl.data_from_values(values)
+    |> Vl.facet([field: "series", type: :nominal, title: nil], child)
+  end
+
+  defp title(nil), do: []
+  defp title(text), do: [title: text]
 
   defp expand(entry, opts) do
     Multiclass.per_class(entry, opts) ++ Multiclass.micro(entry, opts)
