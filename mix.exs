@@ -1,12 +1,12 @@
-defmodule EvalViz.MixProject do
+defmodule Verdict.MixProject do
   use Mix.Project
 
   @version "0.1.0"
-  @source_url "https://github.com/RicardoSantos-99/evalviz"
+  @source_url "https://github.com/RicardoSantos-99/verdict"
 
   def project do
     [
-      app: :evalviz,
+      app: :verdict,
       version: @version,
       elixir: "~> 1.15",
       start_permanent: Mix.env() == :prod,
@@ -15,7 +15,7 @@ defmodule EvalViz.MixProject do
       package: package(),
       docs: docs(),
       source_url: @source_url,
-      name: "EvalViz"
+      name: "Verdict"
     ]
   end
 

@@ -1,10 +1,10 @@
-# EvalViz
+# Verdict
 
 Model evaluation plots for [Nx](https://github.com/elixir-nx/nx). Confusion
 matrices, ROC and precision-recall curves, calibration, residuals,
 projections, and the rest of what you look at after training something.
 
-Scholar computes these metrics and hands back tensors. EvalViz turns tensors
+Scholar computes these metrics and hands back tensors. Verdict turns tensors
 into [Vega-Lite](https://vega.github.io/vega-lite/) specs, which Livebook
 renders on its own.
 
@@ -18,7 +18,7 @@ Add to your `mix.exs`:
 ```elixir
 def deps do
   [
-    {:evalviz, "~> 0.1.0"}
+    {:verdict, "~> 0.1.0"}
   ]
 end
 ```
@@ -27,7 +27,7 @@ end
 
 ```elixir
 Mix.install([
-  {:evalviz, "~> 0.1.0"},
+  {:verdict, "~> 0.1.0"},
   {:kino_vega_lite, "~> 0.1"}
 ])
 ```
@@ -42,7 +42,7 @@ Mix.install([
 One call for the usual screen:
 
 ```elixir
-EvalViz.report(y_true, scores, class_names: ["negative", "positive"])
+Verdict.report(y_true, scores, class_names: ["negative", "positive"])
 ```
 
 That is a confusion matrix, the ROC and precision-recall curves, and the
@@ -53,11 +53,11 @@ views. `kind: :regression` swaps in the regression set.
 Every function returns a `VegaLite` struct, so you can keep going:
 
 ```elixir
-EvalViz.roc_curve(y_true, scores, title: "Held-out set")
+Verdict.roc_curve(y_true, scores, title: "Held-out set")
 |> VegaLite.config(axis: [grid: false])
 ```
 
-To build your own screen, use `EvalViz.grid/2`.
+To build your own screen, use `Verdict.grid/2`.
 
 ## What's in it
 

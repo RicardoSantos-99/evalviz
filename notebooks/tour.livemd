@@ -1,8 +1,8 @@
-# EvalViz tour
+# Verdict tour
 
 ```elixir
 Mix.install([
-  {:evalviz, path: Path.expand("..", __DIR__)},
+  {:verdict, path: Path.expand("..", __DIR__)},
   # kino on its own does not know how to draw a Vega-Lite spec: the
   # Kino.Render implementation for it ships in kino_vega_lite, and without
   # that Livebook prints the struct instead of the chart
@@ -31,14 +31,14 @@ Nx.shape(x)
 y_true = Nx.tensor([0, 0, 1, 1, 2, 2, 0, 1, 2, 2, 1, 0])
 y_pred = Nx.tensor([0, 1, 0, 2, 2, 2, 0, 1, 2, 1, 1, 0])
 
-EvalViz.confusion_matrix(y_true, y_pred, num_classes: 3)
+Verdict.confusion_matrix(y_true, y_pred, num_classes: 3)
 ```
 
 Normalized by true class, with names. Each row now sums to one, so the diagonal
 reads as per-class recall.
 
 ```elixir
-EvalViz.confusion_matrix(y_true, y_pred,
+Verdict.confusion_matrix(y_true, y_pred,
   num_classes: 3,
   class_names: ["cat", "dog", "bird"],
   normalize: :true_class
@@ -54,7 +54,7 @@ EvalViz.confusion_matrix(y_true, y_pred,
 labels = Nx.select(Nx.greater(scores, 0.5), 1, 0)
 weak = Nx.add(Nx.multiply(scores, 0.4), Nx.multiply(noise, 0.6))
 
-EvalViz.roc_curve(
+Verdict.roc_curve(
   [
     {"Strong", labels, scores},
     {"Weak", labels, weak}
@@ -64,7 +64,7 @@ EvalViz.roc_curve(
 ```
 
 ```elixir
-EvalViz.precision_recall_curve(
+Verdict.precision_recall_curve(
   [
     {"Strong", labels, scores},
     {"Weak", labels, weak}
@@ -74,7 +74,7 @@ EvalViz.precision_recall_curve(
 ```
 
 ```elixir
-EvalViz.det_curve(labels, weak, title: "DET")
+Verdict.det_curve(labels, weak, title: "DET")
 ```
 
 ## Multiclass
@@ -102,7 +102,7 @@ my =
 model = Scholar.Linear.LogisticRegression.fit(mx, my, num_classes: 3)
 probabilities = Scholar.Linear.LogisticRegression.predict_probability(model, mx)
 
-EvalViz.roc_curve(my, probabilities,
+Verdict.roc_curve(my, probabilities,
   class_names: ["left", "middle", "right"],
   title: "One-vs-rest ROC"
 )
@@ -116,7 +116,7 @@ pair into one binary problem, so every sample counts the same; `:macro` averages
 the per-class curves, so every class does, however few samples it has.
 
 ```elixir
-EvalViz.roc_curve(my, probabilities,
+Verdict.roc_curve(my, probabilities,
   class_names: ["left", "middle", "right"],
   average: [:micro, :macro],
   title: "With both averages"
@@ -127,7 +127,7 @@ Six classes overlaid would be six curves you have to trace back to a legend.
 `facet: true` gives each its own panel instead, titled with its name and AUC:
 
 ```elixir
-EvalViz.roc_curve(my, probabilities,
+Verdict.roc_curve(my, probabilities,
   class_names: ["left", "middle", "right"],
   facet: true,
   width: 200,
@@ -141,7 +141,7 @@ precision-recall baseline has to be left out because the classes disagree on
 their share of positives. A panel holds one class, so each draws its own:
 
 ```elixir
-EvalViz.precision_recall_curve(my, probabilities,
+Verdict.precision_recall_curve(my, probabilities,
   class_names: ["left", "middle", "right"],
   facet: true,
   width: 200,
@@ -154,7 +154,7 @@ And the threshold curve gets colour back for the metric, so the dash pattern it
 was pushed onto is not needed at all:
 
 ```elixir
-EvalViz.threshold_curve(my, probabilities,
+Verdict.threshold_curve(my, probabilities,
   class_names: ["left", "middle", "right"],
   facet: true,
   width: 210,
@@ -166,7 +166,7 @@ EvalViz.threshold_curve(my, probabilities,
 Calibration takes the same matrix, one curve per class:
 
 ```elixir
-EvalViz.calibration_curve(my, probabilities,
+Verdict.calibration_curve(my, probabilities,
   class_names: ["left", "middle", "right"],
   bins: 5,
   title: "Per-class calibration"
@@ -179,14 +179,14 @@ Every other classification plot says how good the ranking is. This one answers
 what follows: given that ranking, where do you cut?
 
 ```elixir
-EvalViz.threshold_curve(labels, weak, title: "Where to cut")
+Verdict.threshold_curve(labels, weak, title: "Where to cut")
 ```
 
 And here is why that cut works or does not: the scores the model gave, split by
 what the answer actually was.
 
 ```elixir
-EvalViz.score_distribution(labels, weak,
+Verdict.score_distribution(labels, weak,
   class_names: ["negative", "positive"],
   threshold: 0.5,
   title: "The weak model"
@@ -197,7 +197,7 @@ The humps overlap, and everything in the overlap is a mistake some threshold
 has to make. The strong model has the same data with almost no overlap:
 
 ```elixir
-EvalViz.score_distribution(labels, scores,
+Verdict.score_distribution(labels, scores,
   class_names: ["negative", "positive"],
   threshold: 0.5,
   title: "The strong model"
@@ -213,7 +213,7 @@ Nothing is trained here: these are scores you would have measured yourself, one
 per fold, so the mean comes with a band one standard deviation wide.
 
 ```elixir
-EvalViz.learning_curve(
+Verdict.learning_curve(
   [20, 50, 100, 200, 400, 800],
   [
     [1.00, 0.99, 1.00],
@@ -242,7 +242,7 @@ still getting better as the data grows, which is a different question and often
 the one that decides.
 
 ```elixir
-EvalViz.learning_curve(
+Verdict.learning_curve(
   [20, 50, 100, 200, 400],
   [
     {"Linear", [[0.72, 0.70], [0.74, 0.73], [0.75, 0.74], [0.75, 0.75], [0.76, 0.75]],
@@ -294,7 +294,7 @@ scoring = fn xs, ys ->
 end
 
 Scholar.ModelSelection.cross_validate(ms_x, ms_y, folding, scoring)
-|> EvalViz.fold_scores(metric_names: ["MSE", "MAE"], title: "Five folds")
+|> Verdict.fold_scores(metric_names: ["MSE", "MAE"], title: "Five folds")
 ```
 
 One panel per metric, one point per fold, with the mean they scatter around.
@@ -318,7 +318,7 @@ Scholar.ModelSelection.grid_search(ms_x, ms_y, folding, grid_scoring,
   alpha: [0.0, 0.5, 1.0, 5.0, 20.0],
   fit_intercept?: [true, false]
 )
-|> EvalViz.grid_search(best: :min, metric_name: "MSE", title: "Grid search")
+|> Verdict.grid_search(best: :min, metric_name: "MSE", title: "Grid search")
 ```
 
 MSE is best at its smallest, so `best: :min` both outlines the winning cell and
@@ -328,7 +328,7 @@ it by eye.
 And one knob on its own, swept over orders of magnitude:
 
 ```elixir
-EvalViz.validation_curve(
+Verdict.validation_curve(
   [0.001, 0.01, 0.1, 1.0, 10.0, 100.0],
   [
     [0.99, 0.99],
@@ -368,7 +368,7 @@ A model whose probabilities mean what they say tracks the diagonal.
 calibrated_y = Nx.select(Nx.less(r, u), 1, 0)
 overconfident = Nx.clip(Nx.add(Nx.multiply(Nx.subtract(u, 0.5), 1.8), 0.5), 0.001, 0.999)
 
-EvalViz.calibration_curve(
+Verdict.calibration_curve(
   [
     {"Calibrated", calibrated_y, u},
     {"Overconfident", calibrated_y, overconfident}
@@ -383,7 +383,7 @@ EvalViz.calibration_curve(
 ```elixir
 model = Scholar.Cluster.Hierarchical.fit(x, linkage: :ward)
 
-EvalViz.dendrogram(model, color_threshold: 8.0, title: "Ward linkage")
+Verdict.dendrogram(model, color_threshold: 8.0, title: "Ward linkage")
 ```
 
 Try moving `color_threshold` and watch the clusters split and merge. That is
@@ -394,7 +394,7 @@ threshold = Kino.Input.range("Cut height", min: 0.5, max: 25, default: 8, step: 
 ```
 
 ```elixir
-EvalViz.dendrogram(model, color_threshold: Kino.Input.read(threshold))
+Verdict.dendrogram(model, color_threshold: Kino.Input.read(threshold))
 ```
 
 ## Silhouette
@@ -402,7 +402,7 @@ EvalViz.dendrogram(model, color_threshold: Kino.Input.read(threshold))
 ```elixir
 kmeans = Scholar.Cluster.KMeans.fit(x, num_clusters: 3, key: Nx.Random.key(1))
 
-EvalViz.silhouette(x, kmeans.labels, num_clusters: 3, title: "k = 3")
+Verdict.silhouette(x, kmeans.labels, num_clusters: 3, title: "k = 3")
 ```
 
 Ask for more clusters than the data has and the diagram says so: the mean drops
@@ -411,7 +411,7 @@ and bars start going negative, meaning those points sit closer to a neighbour.
 ```elixir
 too_many = Scholar.Cluster.KMeans.fit(x, num_clusters: 6, key: Nx.Random.key(1))
 
-EvalViz.silhouette(x, too_many.labels, num_clusters: 6, title: "k = 6")
+Verdict.silhouette(x, too_many.labels, num_clusters: 6, title: "k = 6")
 ```
 
 ## Elbow
@@ -420,7 +420,7 @@ The silhouette judges one k at a time. This judges them together: hand it the
 models and it plots how much each extra cluster bought.
 
 ```elixir
-EvalViz.elbow(
+Verdict.elbow(
   Enum.map(2..8, &Scholar.Cluster.KMeans.fit(x, num_clusters: &1, key: Nx.Random.key(1))),
   title: "Choosing k"
 )
@@ -451,7 +451,7 @@ mixing =
 wide = Nx.add(Nx.dot(base, mixing), small_noise)
 
 pca = Scholar.Decomposition.PCA.fit(wide, num_components: 6)
-EvalViz.scree(pca, title: "Explained variance")
+Verdict.scree(pca, title: "Explained variance")
 ```
 
 ## Projection
@@ -476,7 +476,7 @@ truth =
 group_pca = Scholar.Decomposition.PCA.fit(groups, num_components: 3)
 projected = Scholar.Decomposition.PCA.transform(group_pca, groups)
 
-EvalViz.projection(projected, truth,
+Verdict.projection(projected, truth,
   label_names: ["left", "middle", "right"],
   title: "Eight dimensions, seen in two"
 )
@@ -491,7 +491,7 @@ clustering gets checked against the truth.
 ```elixir
 kmeans = Scholar.Cluster.KMeans.fit(groups, num_clusters: 3)
 
-EvalViz.projection(projected, [
+Verdict.projection(projected, [
   {"True class", truth},
   {"KMeans", kmeans.labels}
 ])
@@ -506,7 +506,7 @@ tensor, MDS returns a struct carrying it, and both go straight in.
 ```elixir
 mds = Scholar.Manifold.MDS.fit(groups, key: key, num_components: 2)
 
-EvalViz.projection(mds, truth,
+Verdict.projection(mds, truth,
   label_names: ["left", "middle", "right"],
   title: "MDS"
 )
@@ -521,7 +521,7 @@ A biplot puts the features back on the picture: each arrow is one feature,
 pointing the way it pushes the points.
 
 ```elixir
-EvalViz.biplot(group_pca, groups,
+Verdict.biplot(group_pca, groups,
   labels: truth,
   feature_names: Enum.map(0..7, &"f#{&1}"),
   title: "Biplot"
@@ -535,7 +535,7 @@ what carry meaning.
 The same numbers as a heatmap, when there are too many features for arrows:
 
 ```elixir
-EvalViz.loadings(group_pca,
+Verdict.loadings(group_pca,
   feature_names: Enum.map(0..7, &"f#{&1}"),
   title: "What each component is made of"
 )
@@ -555,11 +555,11 @@ target = Nx.add(Nx.add(Nx.multiply(Nx.squeeze(feature), 2.5), 4.0), err)
 fit = Scholar.Linear.LinearRegression.fit(feature, target)
 predicted = Scholar.Linear.LinearRegression.predict(fit, feature)
 
-EvalViz.predicted_vs_actual(target, predicted, title: "Predicted vs actual")
+Verdict.predicted_vs_actual(target, predicted, title: "Predicted vs actual")
 ```
 
 ```elixir
-EvalViz.residuals(target, predicted, title: "Residuals")
+Verdict.residuals(target, predicted, title: "Residuals")
 ```
 
 Fit a straight line to curved data and the residuals arc, which is the plot
@@ -570,7 +570,7 @@ curved = Nx.add(Nx.pow(Nx.squeeze(feature), 2), err)
 bad_fit = Scholar.Linear.LinearRegression.fit(feature, curved)
 bad_pred = Scholar.Linear.LinearRegression.predict(bad_fit, feature)
 
-EvalViz.residuals(curved, bad_pred, title: "Linear fit on quadratic data")
+Verdict.residuals(curved, bad_pred, title: "Linear fit on quadratic data")
 ```
 
 Both regression plots also take a list of models, which puts them on one set of
@@ -580,14 +580,14 @@ different scales.
 ```elixir
 shrunk = Nx.add(Nx.multiply(predicted, 0.85), 2.0)
 
-EvalViz.predicted_vs_actual(
+Verdict.predicted_vs_actual(
   [{"Linear", target, predicted}, {"Shrunk", target, shrunk}],
   title: "Two models, one diagonal"
 )
 ```
 
 ```elixir
-EvalViz.residuals(
+Verdict.residuals(
   [{"Linear", target, predicted}, {"Shrunk", target, shrunk}],
   title: "Two models, one zero line"
 )
@@ -598,11 +598,11 @@ what is left: a histogram, and the residuals against the quantiles a normal
 sample would land on.
 
 ```elixir
-EvalViz.residual_distribution(target, predicted, title: "Residual distribution")
+Verdict.residual_distribution(target, predicted, title: "Residual distribution")
 ```
 
 ```elixir
-EvalViz.qq_plot(Nx.subtract(predicted, target), title: "Normal Q-Q")
+Verdict.qq_plot(Nx.subtract(predicted, target), title: "Normal Q-Q")
 ```
 
 The noise here was drawn from a normal, so the points sit on the line. Run the
@@ -610,7 +610,7 @@ same plot on the bad fit and they do not, because what is left over is the
 curve the model could not follow rather than noise.
 
 ```elixir
-EvalViz.qq_plot(Nx.subtract(bad_pred, curved), title: "Q-Q of the bad fit")
+Verdict.qq_plot(Nx.subtract(bad_pred, curved), title: "Q-Q of the bad fit")
 ```
 
 ## Coefficients and correlation
@@ -620,7 +620,7 @@ What the model learned, and what the features were doing to begin with.
 ```elixir
 wide_fit = Scholar.Linear.LinearRegression.fit(wide, Nx.dot(wide, Nx.tensor([3.0, -2.0, 0.5, 0.1, 0.0, 1.4])))
 
-EvalViz.coefficients(wide_fit,
+Verdict.coefficients(wide_fit,
   feature_names: Enum.map(0..5, &"f#{&1}"),
   title: "Coefficients"
 )
@@ -632,7 +632,7 @@ features were scaled to begin with: on raw columns a large coefficient may say
 nothing more than that the column is measured in small units.
 
 ```elixir
-EvalViz.correlation(wide,
+Verdict.correlation(wide,
   feature_names: Enum.map(0..5, &"f#{&1}"),
   title: "Correlation"
 )
@@ -647,7 +647,7 @@ were built from three directions, and the heatmap says so.
 Everything above, one plot at a time. Most of the time you want the screen:
 
 ```elixir
-EvalViz.report(labels, weak,
+Verdict.report(labels, weak,
   class_names: ["negative", "positive"],
   title: "The weak model, held out"
 )
@@ -658,13 +658,13 @@ four unrelated views: the matrix counts exactly what the rule on the histogram
 splits. Move the threshold and both move together.
 
 ```elixir
-EvalViz.report(labels, weak, threshold: 0.7, title: "Cutting at 0.7 instead")
+Verdict.report(labels, weak, threshold: 0.7, title: "Cutting at 0.7 instead")
 ```
 
 Regression gets its own set, from the same function:
 
 ```elixir
-EvalViz.report(target, predicted, kind: :regression, title: "Linear fit")
+Verdict.report(target, predicted, kind: :regression, title: "Linear fit")
 ```
 
 ## Composing
@@ -672,12 +672,12 @@ EvalViz.report(target, predicted, kind: :regression, title: "Linear fit")
 `report/3` is a convenience over `grid/2`, which lays out whatever you hand it.
 
 ```elixir
-EvalViz.grid(
+Verdict.grid(
   [
-    EvalViz.roc_curve(labels, scores, title: "ROC"),
-    EvalViz.calibration_curve(labels, scores, bins: 8, title: "Calibration"),
-    EvalViz.silhouette(groups, kmeans.labels, num_clusters: 3, title: "Clusters"),
-    EvalViz.scree(pca, title: "Explained variance")
+    Verdict.roc_curve(labels, scores, title: "ROC"),
+    Verdict.calibration_curve(labels, scores, bins: 8, title: "Calibration"),
+    Verdict.silhouette(groups, kmeans.labels, num_clusters: 3, title: "Clusters"),
+    Verdict.scree(pca, title: "Explained variance")
   ],
   title: "Whatever goes together"
 )
@@ -687,7 +687,7 @@ Every function returns a `VegaLite` struct, so you can keep going with the
 `VegaLite` API.
 
 ```elixir
-EvalViz.roc_curve(labels, scores, title: "Held-out set")
+Verdict.roc_curve(labels, scores, title: "Held-out set")
 |> VegaLite.config(axis: [grid: false], view: [stroke: nil])
 ```
 
@@ -695,6 +695,6 @@ EvalViz.roc_curve(labels, scores, title: "Held-out set")
 specification, so it goes on the grid rather than on the plots inside it.
 
 ```elixir
-EvalViz.grid([EvalViz.roc_curve(labels, scores), EvalViz.det_curve(labels, scores)])
+Verdict.grid([Verdict.roc_curve(labels, scores), Verdict.det_curve(labels, scores)])
 |> VegaLite.config(axis: [grid: false])
 ```

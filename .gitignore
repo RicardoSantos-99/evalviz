@@ -20,8 +20,10 @@ erl_crash.dump
 *.ez
 
 # Ignore package tarball (built via "mix hex.build").
-evalviz-*.tar
+verdict-*.tar
 
 
 # local render output used to eyeball charts
 /preview/
+
+.elixir_ls/

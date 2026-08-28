@@ -13,7 +13,7 @@ First release.
   * Model selection: learning curve, validation curve, grid search heatmap,
     and per-fold scores
   * Features: coefficients and correlation matrix
-  * `EvalViz.report/3` for a whole screen in one call, `EvalViz.grid/2` to
+  * `Verdict.report/3` for a whole screen in one call, `Verdict.grid/2` to
     compose any set of plots
   * One-vs-rest multiclass with micro and macro averages, and faceting when
     the overlay gets crowded
