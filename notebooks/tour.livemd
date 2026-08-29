@@ -210,6 +210,34 @@ Verdict.score_distribution(labels, scores,
 Each class sums to one rather than showing raw counts, so a rare class stays
 visible next to a common one. Pass `normalize: :none` for the counts.
 
+## Targeting
+
+The curves so far answer how well the ranking separates the classes. These two
+answer what a budget buys. Contact the list in the order the model ranked it,
+and the gain curve says what share of the positives each share of the list has
+picked up.
+
+```elixir
+Verdict.cumulative_gain([{"Strong", labels, scores}, {"Weak", labels, weak}],
+  title: "What the top of the list is worth"
+)
+```
+
+The dashed diagonal is contacting at random. The gap above it is what the
+ranking is worth, and it is the same number the lift curve states as a
+multiple instead of as a share.
+
+```elixir
+Verdict.lift_curve([{"Strong", labels, scores}, {"Weak", labels, weak}],
+  title: "Times better than random"
+)
+```
+
+Both end where they have to. Contacting everybody captures everybody however
+the list was ordered, so gain reaches one and lift falls to it. Lift starts at
+the first contact rather than at zero, where it would be a share of nothing,
+and it is noisy at the left because a few contacts is a small denominator.
+
 ## Learning curve
 
 Nothing is trained here: these are scores you would have measured yourself, one

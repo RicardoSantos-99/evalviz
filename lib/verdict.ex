@@ -227,6 +227,81 @@ defmodule Verdict do
     Curves.plot(:det, [{nil, y_true, y_score}], opts)
   end
 
+  @doc group: :classification
+  @doc """
+  Plots a cumulative gain curve: the share of positives captured against the
+  share of samples contacted, in the order the model ranked them.
+
+  This is the plot for a budget. A ROC curve says how well the ranking
+  separates the classes; this says what taking the top ten per cent of it
+  actually buys, which is the question a campaign with a fixed reach or a
+  review queue with a fixed head count is really asking.
+
+  The dashed diagonal is what contacting people at random captures. The gap
+  above it is the ranking's worth.
+
+  Takes the same arguments as `roc_curve/3`, multiclass included.
+
+  ## Options
+
+  #{NimbleOptions.docs(Curves.schema())}
+
+  ## Examples
+
+      iex> y_true = Nx.tensor([0, 0, 1, 1])
+      iex> scores = Nx.tensor([0.1, 0.4, 0.35, 0.8])
+      iex> plot = Verdict.cumulative_gain(y_true, scores)
+      iex> VegaLite.to_spec(plot)["data"]["values"] |> Enum.map(&(&1["captured"]))
+      [0.0, 0.5, 0.5, 1.0, 1.0]
+  """
+  def cumulative_gain(series_or_y_true, y_score_or_opts \\ [], opts \\ [])
+
+  def cumulative_gain(series, opts, _) when is_list(series) and is_list(opts) do
+    Curves.plot(:cumulative_gain, normalize_series(series), opts)
+  end
+
+  def cumulative_gain(y_true, y_score, opts) do
+    Curves.plot(:cumulative_gain, [{nil, y_true, y_score}], opts)
+  end
+
+  @doc group: :classification
+  @doc """
+  Plots a lift curve: how many times better than random the ranking is, at
+  every share of samples contacted.
+
+  The same numbers `cumulative_gain/3` draws, divided by the diagonal it is
+  read against. A gain curve says a fifth of the list holds half the
+  positives; this says that fifth is two and a half times better than picking
+  at random, which is the number that survives being quoted.
+
+  The dashed line at one is no skill. Lift always ends there, since contacting
+  everybody captures everybody however they were ordered, and it starts at the
+  first contact rather than at zero, where it would be a share of nothing.
+
+  Takes the same arguments as `roc_curve/3`, multiclass included.
+
+  ## Options
+
+  #{NimbleOptions.docs(Curves.schema())}
+
+  ## Examples
+
+      iex> y_true = Nx.tensor([0, 0, 1, 1])
+      iex> scores = Nx.tensor([0.1, 0.4, 0.35, 0.8])
+      iex> plot = Verdict.lift_curve(y_true, scores)
+      iex> VegaLite.to_spec(plot)["data"]["values"] |> Enum.map(&(&1["contacted"]))
+      [0.25, 0.5, 0.75, 1.0]
+  """
+  def lift_curve(series_or_y_true, y_score_or_opts \\ [], opts \\ [])
+
+  def lift_curve(series, opts, _) when is_list(series) and is_list(opts) do
+    Curves.plot(:lift, normalize_series(series), opts)
+  end
+
+  def lift_curve(y_true, y_score, opts) do
+    Curves.plot(:lift, [{nil, y_true, y_score}], opts)
+  end
+
   @doc group: :clustering
   @doc """
   Plots a dendrogram of an agglomerative clustering.

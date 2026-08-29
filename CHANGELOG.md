@@ -5,7 +5,8 @@
 First release.
 
   * Classification: confusion matrix, ROC, precision-recall, DET, calibration,
-    threshold curve, and score distribution by true class
+    threshold curve, cumulative gain, lift, and score distribution by true
+    class
   * Regression: predicted against actual, residuals, residual distribution,
     and normal Q-Q
   * Clustering and decomposition: dendrogram, silhouette, OPTICS reachability,

@@ -70,9 +70,9 @@ Verdict.report(y_true, scores) |> Verdict.zoomable()
 ## What's in it
 
 **Classification.** Confusion matrix, ROC, precision-recall, DET, calibration,
-threshold curve, and scores split by true class. All of them take a list of
-models to compare, and a score matrix for one-vs-rest multiclass with micro
-and macro averages.
+threshold curve, cumulative gain, lift, and scores split by true class. All of
+them take a list of models to compare, and a score matrix for one-vs-rest
+multiclass with micro and macro averages.
 
 **Regression.** Predicted against actual, residuals, their distribution, and a
 normal Q-Q.

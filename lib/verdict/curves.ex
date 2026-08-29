@@ -65,7 +65,7 @@ defmodule Verdict.Curves do
       compute: &Metrics.roc_curve/4,
       summary: {"AUC", &Metrics.roc_auc_score/4},
       chance: :diagonal,
-      domain: [0, 1]
+      domains: %{x: [0, 1], y: [0, 1]}
     }
   end
 
@@ -81,7 +81,7 @@ defmodule Verdict.Curves do
       end,
       summary: {"AP", &Metrics.average_precision_score/4},
       chance: :positive_rate,
-      domain: [0, 1]
+      domains: %{x: [0, 1], y: [0, 1]}
     }
   end
 
@@ -92,8 +92,60 @@ defmodule Verdict.Curves do
       compute: &Metrics.det_curve/4,
       summary: nil,
       chance: :none,
-      domain: nil
+      domains: %{x: nil, y: nil}
     }
+  end
+
+  # Both read off the ROC curve rather than being counted again. The share of
+  # samples contacted is what the two rates mix to, and the share of positives
+  # captured is the true positive rate itself, so the ties and the weighting
+  # are handled once, in Scholar, and the two plots cannot drift from the ROC
+  # of the same model.
+  defp config(:cumulative_gain) do
+    %{
+      x: {"contacted", "Share of samples contacted"},
+      y: {"captured", "Share of positives captured"},
+      compute: &targeting(&1, &2, &3, &4, :gain),
+      summary: nil,
+      chance: :diagonal,
+      domains: %{x: [0, 1], y: [0, 1]}
+    }
+  end
+
+  defp config(:lift) do
+    %{
+      x: {"contacted", "Share of samples contacted"},
+      y: {"lift", "Times better than random"},
+      compute: &targeting(&1, &2, &3, &4, :lift),
+      summary: nil,
+      chance: :unit,
+      domains: %{x: [0, 1], y: nil}
+    }
+  end
+
+  # Contacting nobody captures nobody, which is a point on the gain curve and
+  # a zero over zero on the lift, so lift starts at the first contact.
+  defp targeting(y_true, y_score, dvi, weights, kind) do
+    {fpr, tpr, thresholds} = Metrics.roc_curve(y_true, y_score, dvi, weights)
+
+    # An absent weight arrives as the number one rather than as a tensor of
+    # them, and the share is a weighted one either way.
+    weights = Nx.broadcast(weights, {Nx.axis_size(y_true, 0)})
+    positive_rate = Nx.divide(Nx.sum(Nx.multiply(y_true, weights)), Nx.sum(weights))
+
+    contacted =
+      Nx.add(
+        Nx.multiply(tpr, positive_rate),
+        Nx.multiply(fpr, Nx.subtract(1, positive_rate))
+      )
+
+    case kind do
+      :gain ->
+        {contacted, tpr, thresholds}
+
+      :lift ->
+        {contacted[1..-1//1], Nx.divide(tpr[1..-1//1], contacted[1..-1//1]), thresholds[1..-1//1]}
+    end
   end
 
   def plot(kind, series, opts) do
@@ -265,8 +317,8 @@ defmodule Verdict.Curves do
     curve =
       Vl.new()
       |> Vl.mark(:line, point: show_points, tooltip: true, interpolate: "step-after")
-      |> Vl.encode_field(:x, x_field, [type: :quantitative, title: x_title] ++ scale(config))
-      |> Vl.encode_field(:y, y_field, [type: :quantitative, title: y_title] ++ scale(config))
+      |> Vl.encode_field(:x, x_field, [type: :quantitative, title: x_title] ++ scale(config, :x))
+      |> Vl.encode_field(:y, y_field, [type: :quantitative, title: y_title] ++ scale(config, :y))
       |> encode_series(multi?)
 
     case chance_layer(config.chance, curves, faceted?, opts) do
@@ -283,8 +335,12 @@ defmodule Verdict.Curves do
     Vl.encode_field(layer, :color, "series", type: :nominal, title: nil)
   end
 
-  defp scale(%{domain: nil}), do: []
-  defp scale(%{domain: [min, max]}), do: [scale: [domain: [min, max], nice: false]]
+  defp scale(%{domains: domains}, axis) do
+    case domains[axis] do
+      nil -> []
+      [min, max] -> [scale: [domain: [min, max], nice: false]]
+    end
+  end
 
   defp chance_layer(:none, _curves, _faceted?, _opts), do: nil
 
@@ -294,6 +350,12 @@ defmodule Verdict.Curves do
 
   defp build_chance_layer(:diagonal, _curves, _faceted?) do
     reference_line([%{"x" => 0, "y" => 0}, %{"x" => 1, "y" => 1}])
+  end
+
+  # Lift is already stated as a multiple of random, so no skill is a flat one
+  # whatever the share of positives happens to be.
+  defp build_chance_layer(:unit, _curves, _faceted?) do
+    reference_line([%{"x" => 0, "y" => 1}, %{"x" => 1, "y" => 1}])
   end
 
   # A panel holds one class, so it can draw that class's own share rather than
