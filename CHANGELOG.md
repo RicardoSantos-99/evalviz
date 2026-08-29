@@ -20,3 +20,5 @@ First release.
   * Model comparison across the curves, calibration, regression plots, and
     learning curves
   * Sample weights across the plots that count
+  * `Verdict.zoomable/2` to drag and scroll a plot's axes, applied to every
+    view of a screen at once

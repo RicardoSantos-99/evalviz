@@ -705,3 +705,30 @@ specification, so it goes on the grid rather than on the plots inside it.
 Verdict.grid([Verdict.roc_curve(labels, scores), Verdict.det_curve(labels, scores)])
 |> VegaLite.config(axis: [grid: false])
 ```
+
+## Zooming
+
+A projection of a few thousand samples arrives as a cloud, and the corner of a
+ROC curve worth reading is too small to see at full scale. `zoomable/2` binds a
+drag and the scroll wheel to the axes, so that part can be reached without the
+plot being drawn again at another range.
+
+```elixir
+Verdict.projection(projected, truth, label_names: ["left", "middle", "right"])
+|> Verdict.zoomable()
+```
+
+Give it a screen and every view on it is zoomed at once. The confusion matrix
+is left as it is: a drag moves a scale only where that scale is continuous, and
+a matrix puts its classes on a discrete one.
+
+```elixir
+Verdict.report(labels, scores) |> Verdict.zoomable()
+```
+
+Naming one axis pins the other, which is what a curve read against its diagonal
+wants.
+
+```elixir
+Verdict.roc_curve(labels, scores) |> Verdict.zoomable(encodings: [:x])
+```

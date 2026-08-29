@@ -59,6 +59,7 @@ defmodule Verdict do
   alias Verdict.Threshold
   alias Verdict.Silhouette
   alias Verdict.ValidationCurve
+  alias Verdict.Zoom
 
   @doc group: :classification
   @doc """
@@ -975,6 +976,41 @@ defmodule Verdict do
       1
   """
   def grid(views, opts \\ []), do: Grid.plot(views, opts)
+
+  @doc group: :screens
+  @doc """
+  Lets the reader drag and scroll a plot's axes.
+
+  A scatter of thousands of points is a cloud until you can get inside it, and
+  the interesting part of a ROC curve is a corner too small to read at full
+  scale. This binds a drag and the scroll wheel to the axes, so the reader can
+  go there without the plot being rebuilt at a different range.
+
+  Takes any specification this library returns and gives back the same one,
+  zoomable. A plot drawn from several views, `report/3` and `grid/2` included,
+  has each of its views made zoomable in turn. Views that put their axes on
+  categories, such as a confusion matrix, are left alone: Vega-Lite binds a
+  drag to a scale only where that scale is continuous.
+
+  ## Options
+
+  #{NimbleOptions.docs(Zoom.schema())}
+
+  ## Examples
+
+      iex> embedding = Nx.tensor([[0.0, 0.0], [1.0, 0.5], [5.0, 5.0], [5.5, 4.8]])
+      iex> plot = Verdict.projection(embedding) |> Verdict.zoomable()
+      iex> VegaLite.to_spec(plot)["params"] |> Enum.map(&(&1["bind"]))
+      ["scales"]
+
+      iex> y_true = Nx.tensor([0, 0, 1, 1])
+      iex> scores = Nx.tensor([0.1, 0.4, 0.35, 0.8])
+      iex> plot = Verdict.roc_curve(y_true, scores) |> Verdict.zoomable(encodings: [:x])
+      iex> [layer] = VegaLite.to_spec(plot)["layer"] |> Enum.filter(&(&1["params"]))
+      iex> layer["params"] |> Enum.map(&(&1["select"]["encodings"]))
+      [["x"]]
+  """
+  def zoomable(plot, opts \\ []), do: Zoom.apply(plot, opts)
 
   @doc group: :screens
   @doc """

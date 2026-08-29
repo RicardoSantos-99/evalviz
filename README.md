@@ -59,6 +59,14 @@ Verdict.roc_curve(y_true, scores, title: "Held-out set")
 
 To build your own screen, use `Verdict.grid/2`.
 
+A plot with more points than the frame can separate is a cloud until you can
+get inside it. `Verdict.zoomable/2` binds a drag and the scroll wheel to the
+axes, on every view of a screen at once:
+
+```elixir
+Verdict.report(y_true, scores) |> Verdict.zoomable()
+```
+
 ## What's in it
 
 **Classification.** Confusion matrix, ROC, precision-recall, DET, calibration,
@@ -76,7 +84,8 @@ normal Q-Q.
 and per-fold scores, all reading what `Scholar.ModelSelection` returns.
 
 **Everything else.** Coefficients, correlation matrix, sample weights across
-the counting plots, and faceting when a one-vs-rest overlay gets crowded.
+the counting plots, faceting when a one-vs-rest overlay gets crowded, and
+drag-to-zoom on any plot whose axes are continuous.
 
 The [tour](notebooks/tour.livemd) walks through every plot with generated
 data, including models that are deliberately wrong so you can see what that
