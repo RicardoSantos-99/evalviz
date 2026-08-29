@@ -417,6 +417,38 @@ too_many = Scholar.Cluster.KMeans.fit(x, num_clusters: 6, key: Nx.Random.key(1))
 Verdict.silhouette(x, too_many.labels, num_clusters: 6, title: "k = 6")
 ```
 
+## Reachability
+
+OPTICS does not hand back clusters so much as an ordering with a distance
+attached to every point, and the reachability plot is how that ordering is
+read. A valley is a cluster and the walls either side say how separated it is,
+so one picture replaces a run at several cut-offs.
+
+```elixir
+optics = Scholar.Cluster.OPTICS.fit(x, eps: 2.0, min_samples: 5)
+
+Verdict.reachability(optics, title: "OPTICS reachability")
+```
+
+The dashed horizontal line is the distance the clusters were extracted at.
+Passing `:cut_off` moves it without fitting again, which is how the next value
+to try gets chosen.
+
+```elixir
+Verdict.reachability(optics, cut_off: 1.0, title: "Cut lower")
+```
+
+A point OPTICS could not reach carries an infinite distance, which no axis can
+hold. Those are drawn as full-height dashed rules rather than bars, so the wall
+stays visible without a number being invented for it. The first point in the
+ordering is always one of them, and a `:max_eps` tight enough will produce many
+more.
+
+```elixir
+Scholar.Cluster.OPTICS.fit(x, max_eps: 0.8, min_samples: 5)
+|> Verdict.reachability(title: "Reachable only within 0.8")
+```
+
 ## Elbow
 
 The silhouette judges one k at a time. This judges them together: hand it the

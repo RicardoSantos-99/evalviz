@@ -52,6 +52,7 @@ defmodule Verdict do
   alias Verdict.LearningCurve
   alias Verdict.Loadings
   alias Verdict.Projection
+  alias Verdict.Reachability
   alias Verdict.Regression
   alias Verdict.Report
   alias Verdict.Scree
@@ -336,6 +337,39 @@ defmodule Verdict do
   def elbow(ks, scores, opts) do
     Elbow.plot(numbers(ks), numbers(scores), opts)
   end
+
+  @doc group: :clustering
+  @doc """
+  Plots the reachability distance of every point in the order OPTICS visited
+  them.
+
+  This is the plot OPTICS exists to produce. A valley is a cluster, and the
+  distance the walls either side of it rise to is how separated that cluster
+  is, so a run at several `:eps` values is replaced by reading the cut-off off
+  one picture.
+
+  Takes a fitted `Scholar.Cluster.OPTICS` model. Both the distances and the
+  labels are read through the model's `:ordering`, which is what puts each
+  point beside the one OPTICS reached it from.
+
+  A point OPTICS could not reach carries an infinite distance, which no axis
+  can hold. Those are drawn as full-height dashed rules instead of bars, so the
+  wall stays visible without a number being invented for it.
+
+  ## Options
+
+  #{NimbleOptions.docs(Reachability.schema())}
+
+  ## Examples
+
+      iex> x = Nx.tensor([[1, 2], [2, 5], [3, 6], [8, 7], [8, 8], [7, 3]], type: :f64)
+      iex> model = Scholar.Cluster.OPTICS.fit(x, eps: 4.5, min_samples: 2)
+      iex> plot = Verdict.reachability(model)
+      iex> [bars | _] = VegaLite.to_spec(plot)["layer"]
+      iex> bars["data"]["values"] |> Enum.map(&(&1["point"]))
+      [1, 2, 5, 3, 4]
+  """
+  def reachability(model, opts \\ []), do: Reachability.plot(model, opts)
 
   @doc group: :clustering
   @doc """

@@ -8,8 +8,8 @@ First release.
     threshold curve, and score distribution by true class
   * Regression: predicted against actual, residuals, residual distribution,
     and normal Q-Q
-  * Clustering and decomposition: dendrogram, silhouette, elbow, PCA scree,
-    2-D projection, biplot, and loadings heatmap
+  * Clustering and decomposition: dendrogram, silhouette, OPTICS reachability,
+    elbow, PCA scree, 2-D projection, biplot, and loadings heatmap
   * Model selection: learning curve, validation curve, grid search heatmap,
     and per-fold scores
   * Features: coefficients and correlation matrix

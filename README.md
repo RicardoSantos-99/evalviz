@@ -77,8 +77,8 @@ and macro averages.
 **Regression.** Predicted against actual, residuals, their distribution, and a
 normal Q-Q.
 
-**Clustering and decomposition.** Dendrogram, silhouette, elbow, PCA scree,
-2-D projection, biplot, and a loadings heatmap.
+**Clustering and decomposition.** Dendrogram, silhouette, OPTICS reachability,
+elbow, PCA scree, 2-D projection, biplot, and a loadings heatmap.
 
 **Model selection.** Learning curve, validation curve, grid search heatmap,
 and per-fold scores, all reading what `Scholar.ModelSelection` returns.
