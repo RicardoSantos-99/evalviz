@@ -45,6 +45,7 @@ defmodule Verdict do
   alias Verdict.Dendrogram
   alias Verdict.Distribution
   alias Verdict.Elbow
+  alias Verdict.FeatureDistribution
   alias Verdict.FoldScores
   alias Verdict.Grid
   alias Verdict.GridSearch
@@ -646,6 +647,35 @@ defmodule Verdict do
       ["1.0", "1.0", "1.0", "1.0"]
   """
   def correlation(x, opts \\ []), do: Correlation.plot(x, opts)
+
+  @doc group: :features
+  @doc """
+  Plots the distribution of every feature, split by true class.
+
+  This is the plot that comes before any model does: does a feature separate
+  the classes at all, on its own, before anything is fit to it. One panel per
+  column of `x`, each an overlaid histogram the way `score_distribution/3`
+  draws one for a model's scores, only here it is the raw feature rather than
+  what a model made of it.
+
+  Each class's bars sum to one by default, which is what keeps a rare class
+  visible next to a common one. Pass `normalize: :none` for raw counts.
+
+  ## Options
+
+  #{NimbleOptions.docs(FeatureDistribution.schema())}
+
+  ## Examples
+
+      iex> x = Nx.tensor([[1.0, 5.0], [2.0, 5.5], [8.0, 1.0], [9.0, 1.5]])
+      iex> labels = Nx.tensor([0, 0, 1, 1])
+      iex> plot = Verdict.feature_distribution(x, labels, feature_names: ["income", "age"])
+      iex> VegaLite.to_spec(plot)["concat"] |> Enum.map(&(&1["title"]))
+      ["income", "age"]
+  """
+  def feature_distribution(x, labels, opts \\ []) do
+    FeatureDistribution.plot(x, labels, opts)
+  end
 
   @doc group: :classification
   @doc """

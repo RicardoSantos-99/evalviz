@@ -83,9 +83,9 @@ elbow, PCA scree, 2-D projection, biplot, and a loadings heatmap.
 **Model selection.** Learning curve, validation curve, grid search heatmap,
 and per-fold scores, all reading what `Scholar.ModelSelection` returns.
 
-**Everything else.** Coefficients, correlation matrix, sample weights across
-the counting plots, faceting when a one-vs-rest overlay gets crowded, and
-drag-to-zoom on any plot whose axes are continuous.
+**Everything else.** Coefficients, correlation matrix, feature distribution by
+class, sample weights across the counting plots, faceting when a one-vs-rest
+overlay gets crowded, and drag-to-zoom on any plot whose axes are continuous.
 
 The [tour](notebooks/tour.livemd) walks through every plot with generated
 data, including models that are deliberately wrong so you can see what that

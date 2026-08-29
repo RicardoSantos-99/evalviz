@@ -41,59 +41,24 @@ defmodule Verdict.ScoreDistribution do
     opts = NimbleOptions.validate!(opts, @opts_schema)
     Internal.assert_paired!(y_true, y_score, "y_true", "y_score")
 
-    scores = Nx.to_flat_list(y_score)
-    span = Internal.bin_span(scores, opts[:bins])
     weights = Internal.weight_list(opts[:sample_weights], Nx.axis_size(y_true, 0))
 
-    grouped =
-      [Nx.to_flat_list(y_true), scores, weights]
-      |> Enum.zip()
-      |> Enum.group_by(&elem(&1, 0), fn {_label, score, weight} -> {score, weight} end)
-      |> Enum.sort_by(&elem(&1, 0))
-
-    names = class_names(grouped, opts[:class_names])
-    values = Enum.flat_map(grouped, &bars(&1, span, names, opts))
+    {values, ordered} =
+      Internal.class_histogram(
+        Nx.to_flat_list(y_score),
+        Nx.to_flat_list(y_true),
+        weights,
+        opts[:bins],
+        opts[:normalize],
+        opts[:class_names]
+      )
 
     Vl.new(vl_opts(opts))
     |> Vl.data_from_values(values)
-    |> Vl.layers(layers(names, values, opts))
+    |> Vl.layers(layers(ordered, values, opts))
   end
 
-  defp bars({label, weighted}, span, names, opts) do
-    {scores, weights} = Enum.unzip(weighted)
-    counts = Internal.bin_counts(scores, span, opts[:bins], weights)
-
-    # The class total is the weight it carries, not how many rows it has, so a
-    # weighted class still sums to one.
-    divisor = if opts[:normalize] == :class, do: Enum.sum(weights), else: 1
-    name = Map.fetch!(names, label)
-
-    counts
-    |> Enum.reject(fn {_lower, _upper, count} -> count == 0 end)
-    |> Enum.map(fn {lower, upper, count} ->
-      %{
-        "lower" => lower,
-        "upper" => upper,
-        "zero" => 0,
-        "value" => count / divisor,
-        "class" => name
-      }
-    end)
-  end
-
-  defp class_names(grouped, nil) do
-    Map.new(grouped, fn {label, _} -> {label, to_string(label)} end)
-  end
-
-  defp class_names(grouped, names) do
-    Map.new(grouped, fn {label, _} ->
-      {label, names |> Enum.at(trunc(label), label) |> to_string()}
-    end)
-  end
-
-  defp layers(names, values, opts) do
-    ordered = names |> Map.values() |> Enum.uniq()
-
+  defp layers(ordered, values, opts) do
     # Both axes carry a quantity, so the bar has to be told its extent on each:
     # x across the bin, y up from zero. Given only x2 it would draw as a dash
     # floating at the count. Every bar starting at zero is also what overlays

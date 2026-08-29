@@ -709,6 +709,32 @@ The colour scale is pinned to `-1..1` rather than fitted, so a matrix of weak
 correlations does not colour like a matrix of strong ones. These six columns
 were built from three directions, and the heatmap says so.
 
+## Feature distribution
+
+Before any model: does a feature separate the classes at all, on its own. One
+panel per column, each an overlaid histogram the way `score_distribution/3`
+draws one for a model's scores, only here it is the raw feature.
+
+```elixir
+key = Nx.Random.key(21)
+{f0, key} = Nx.Random.normal(key, 0.0, 1.0, shape: {200})
+{f1, key} = Nx.Random.normal(key, 0.0, 1.0, shape: {200})
+{f2, _key} = Nx.Random.normal(key, 0.0, 1.0, shape: {200})
+
+labels = Nx.select(Nx.greater(f0, 0.3), 1, 0)
+features = Nx.stack([f0, Nx.add(f1, Nx.multiply(labels, 2.0)), f2], axis: 1)
+
+Verdict.feature_distribution(features, labels,
+  feature_names: ["decisive", "helps some", "noise"],
+  title: "Which features are worth anything"
+)
+```
+
+The first panel is what `labels` was built from, so it splits clean at the
+cut-off. The second helps without settling anything on its own, and the third
+is pure noise: same shape for both classes, because it has nothing to do with
+either.
+
 ## The whole picture in one call
 
 Everything above, one plot at a time. Most of the time you want the screen:

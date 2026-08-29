@@ -113,6 +113,61 @@ defmodule Verdict.Internal do
     ((value - lower) / width) |> trunc() |> max(0) |> min(count - 1)
   end
 
+  @doc """
+  Overlaid histogram bars for `values` split by `labels`, one bin span shared
+  across every class so the bars line up.
+
+  Returns `{bars, class_names}`, the second being every class present, named
+  and ordered by label, for the colour scale built from it.
+  """
+  def class_histogram(values, labels, weights, bins, normalize, names_opt) do
+    span = bin_span(values, bins)
+
+    grouped =
+      [labels, values, weights]
+      |> Enum.zip()
+      |> Enum.group_by(&elem(&1, 0), fn {_label, value, weight} -> {value, weight} end)
+      |> Enum.sort_by(&elem(&1, 0))
+
+    names = histogram_class_names(grouped, names_opt)
+    ordered = Enum.map(grouped, fn {label, _} -> Map.fetch!(names, label) end)
+
+    bars =
+      Enum.flat_map(grouped, fn {label, weighted} ->
+        {class_values, class_weights} = Enum.unzip(weighted)
+        counts = bin_counts(class_values, span, bins, class_weights)
+
+        # The class total is the weight it carries, not how many rows it has,
+        # so a weighted class still sums to one.
+        divisor = if normalize == :class, do: Enum.sum(class_weights), else: 1
+        name = Map.fetch!(names, label)
+
+        counts
+        |> Enum.reject(fn {_lower, _upper, count} -> count == 0 end)
+        |> Enum.map(fn {lower, upper, count} ->
+          %{
+            "lower" => lower,
+            "upper" => upper,
+            "zero" => 0,
+            "value" => count / divisor,
+            "class" => name
+          }
+        end)
+      end)
+
+    {bars, ordered}
+  end
+
+  defp histogram_class_names(grouped, nil) do
+    Map.new(grouped, fn {label, _} -> {label, to_string(label)} end)
+  end
+
+  defp histogram_class_names(grouped, names) do
+    Map.new(grouped, fn {label, _} ->
+      {label, names |> Enum.at(trunc(label), label) |> to_string()}
+    end)
+  end
+
   @a [
     -3.969683028665376e+01,
     2.209460984245205e+02,
